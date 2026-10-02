@@ -1,0 +1,12 @@
+# Workers 静的アセットに含めないもの
+**/.git
+**/.github
+**/node_modules
+**/.DS_Store
+.claude
+.wrangler
+.gitignore
+.assetsignore
+wrangler.toml
+README.md
+docs

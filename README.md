@@ -67,16 +67,18 @@ python3 -m http.server 8765
 
 音はブラウザの制約により、最初のクリックやキー操作のあとから鳴り始めます。推奨ブラウザは Chrome / Edge です（Web MIDI を使う場合は必須）。
 
-## Cloudflare Pages への公開
+## Cloudflare への公開
 
-ビルド工程がないので、リポジトリをそのまま Cloudflare Pages に載せられます。`wrangler.toml` と `_headers` を同梱しています。
+ビルド工程がないので、リポジトリをそのまま Cloudflare Workers の静的アセット配信に載せられます。`wrangler.toml`（配信対象はリポジトリ直下）、`.assetsignore`（README や docs など配信不要なファイルの除外）、`_headers` を同梱しています。
 
 ### A. GitHub 連携（push で自動デプロイ）
 
-1. Cloudflare ダッシュボード → Workers & Pages → Create → Pages → Connect to Git
+1. Cloudflare ダッシュボード → Workers & Pages → Create → Workers → Import a repository
 2. リポジトリ `suzuki1120/music-tool` を選択
-3. ビルド設定: Framework preset は None、Build command は空欄、Build output directory は `/`
+3. Build command は空欄、Deploy command は `npx wrangler deploy`（既定値のまま）
 4. Save and Deploy。以後 `main` への push ごとに自動で再デプロイされます
+
+Worker 名は `wrangler.toml` の `name`（`music-tool`）が使われます。ダッシュボードで別の名前を付けた場合は `name` を合わせてください。
 
 ### B. CLI（wrangler で直接アップロード）
 
@@ -85,15 +87,10 @@ npx wrangler login
 ```
 
 ```bash
-npx wrangler pages project create music-tool --production-branch main
+npx wrangler deploy
 ```
 
-```bash
-npx wrangler pages deploy
-```
-
-公開 URL は `https://music-tool.pages.dev` のような形になります（プロジェクト名が既に使われている場合は別名になります）。
-`.git` / `node_modules` / `.DS_Store` は Pages 側で自動的に除外されます。
+公開 URL は `https://music-tool.<アカウント名>.workers.dev` の形になります。
 
 ## 操作一覧
 

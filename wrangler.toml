@@ -1,5 +1,9 @@
-# Cloudflare Pages 設定（静的サイト、ビルド不要）
-# デプロイ: npx wrangler pages deploy
+# Cloudflare Workers（静的アセット配信）設定。ビルド工程なし。
+# デプロイ: npx wrangler deploy
 name = "music-tool"
-pages_build_output_dir = "."
 compatibility_date = "2026-10-02"
+
+[assets]
+directory = "."
+html_handling = "auto-trailing-slash"
+not_found_handling = "404-page"
