@@ -2,6 +2,7 @@
 # デプロイ: npx wrangler deploy
 name = "music-tool"
 compatibility_date = "2026-10-02"
+workers_dev = true
 
 [assets]
 directory = "."
