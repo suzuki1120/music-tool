@@ -2,10 +2,11 @@
  * TB-303 style monosynth — persistent oscillator / filter / VCA like the real unit,
  * so slides are true legato glides and accents retrigger the envelopes.
  *
- * trigger(note, octave, time, { accent, legato, tie, gate, velocity })
+ * trigger(note, octave, time, { accent, legato, tie, gate, velocity, lock })
  *   legato : this note is reached by a slide from the previous step (no envelope retrigger, pitch glides)
  *   tie    : this note slides INTO the next step (gate held open until the next trigger)
  *   gate   : seconds the note is held before release
+ *   lock   : per-step parameter lock { cutoff, resonance, envMod, decay } — overrides the knobs for this step only
  */
 class TB303 {
     constructor(engine) {
@@ -16,6 +17,7 @@ class TB303 {
         this.envMod = 50;         // 0..100
         this.decay = 0.3;         // s
         this.accentLevel = 50;    // 0..100
+        this.drive = 20;          // 0..100 overdrive
         this.waveform = 'sawtooth';
         this.level = 0.8;
         this.slideTime = 0.07;
@@ -46,9 +48,11 @@ class TB303 {
         this.filter.frequency.value = this.cutoff;
         this.filter.Q.value = this._q(this.resonance);
 
-        this.drive = ctx.createWaveShaper();
-        this.drive.curve = this._makeDriveCurve(2.5);
-        this.drive.oversample = '2x';
+        this.driveIn = ctx.createGain();
+        this.driveNode = ctx.createWaveShaper();
+        this.driveNode.oversample = '2x';
+        this.driveOut = ctx.createGain();
+        this._applyDrive();
 
         this.vca = ctx.createGain();
         this.vca.gain.value = 0;
@@ -60,10 +64,12 @@ class TB303 {
         this.oscSqr.connect(this.sqrGain);
         this.sawGain.connect(this.filter);
         this.sqrGain.connect(this.filter);
-        this.filter.connect(this.drive);
-        this.drive.connect(this.vca);
+        this.filter.connect(this.driveIn);
+        this.driveIn.connect(this.driveNode);
+        this.driveNode.connect(this.driveOut);
+        this.driveOut.connect(this.vca);
         this.vca.connect(this.out);
-        this.out.connect(this.engine.dest);
+        this.out.connect(this.engine.channelInput('303'));
 
         this.oscSaw.start();
         this.oscSqr.start();
@@ -77,9 +83,18 @@ class TB303 {
         return 0.6 + Math.pow(r, 1.6) * 20;
     }
 
+    _applyDrive() {
+        if (!this.driveNode) return;
+        const d = this.drive / 100;
+        const amount = 1.5 + d * 14;              // curve hardness
+        const pre = 1 + d * 5;                    // input gain
+        this.driveNode.curve = this._makeDriveCurve(amount);
+        this.driveIn.gain.setTargetAtTime(pre, this._now(), 0.02);
+        this.driveOut.gain.setTargetAtTime(1 / Math.pow(pre, 0.6), this._now(), 0.02);
+    }
+
     setCutoff(value) {
         this.cutoff = Math.max(60, Math.min(8000, value));
-        // Audible immediately when no envelope is running (sustained / idle)
         if (this.filter && this._now() > this.lastTriggerTime + this.decay) {
             this.filter.frequency.setTargetAtTime(this.cutoff, this._now(), 0.02);
         }
@@ -93,6 +108,7 @@ class TB303 {
     setEnvMod(value) { this.envMod = Math.max(0, Math.min(100, value)); this._emit(); }
     setDecay(value) { this.decay = Math.max(0.03, Math.min(3, value)); this._emit(); }
     setAccent(value) { this.accentLevel = Math.max(0, Math.min(100, value)); this._emit(); }
+    setDrive(value) { this.drive = Math.max(0, Math.min(100, value)); this._applyDrive(); this._emit(); }
     setWaveform(type) {
         this.waveform = type === 'square' ? 'square' : 'sawtooth';
         if (this.sawGain) {
@@ -111,8 +127,20 @@ class TB303 {
     getParams() {
         return {
             cutoff: this.cutoff, resonance: this.resonance, envMod: this.envMod,
-            decay: this.decay, accent: this.accentLevel, waveform: this.waveform, level: this.level
+            decay: this.decay, accent: this.accentLevel, drive: this.drive, waveform: this.waveform, level: this.level
         };
+    }
+
+    setParams(p) {
+        if (!p) return;
+        if (p.cutoff !== undefined) this.setCutoff(p.cutoff);
+        if (p.resonance !== undefined) this.setResonance(p.resonance);
+        if (p.envMod !== undefined) this.setEnvMod(p.envMod);
+        if (p.decay !== undefined) this.setDecay(p.decay);
+        if (p.accent !== undefined) this.setAccent(p.accent);
+        if (p.drive !== undefined) this.setDrive(p.drive);
+        if (p.waveform !== undefined) this.setWaveform(p.waveform);
+        if (p.level !== undefined) this.setLevel(p.level);
     }
 
     _emit() { if (this.onParamChange) this.onParamChange(this.getParams()); }
@@ -130,12 +158,19 @@ class TB303 {
     trigger(note, octave, time, options = {}) {
         if (!this.oscSaw) this.init();
         if (!this.oscSaw) return;
+        if (this.engine.effectiveGain('303') <= 0.002 && !options.force) return;
 
-        const { accent = false, legato = false, tie = false, gate = 0.1, velocity = 1 } = options;
+        const { accent = false, legato = false, tie = false, gate = 0.1, velocity = 1, lock = null } = options;
         const pf = this.engine.pitchFactor || 1;
         const baseFreq = this.noteToFreq(note, octave);
         const freq = baseFreq * pf;
         const acc = this.accentLevel / 100;
+
+        // parameter locks override the panel for this step only
+        const cutoff = lock && lock.cutoff !== undefined ? lock.cutoff : this.cutoff;
+        const resonance = lock && lock.resonance !== undefined ? lock.resonance : this.resonance;
+        const envMod = lock && lock.envMod !== undefined ? lock.envMod : this.envMod;
+        const decay = lock && lock.decay !== undefined ? lock.decay : this.decay;
 
         // --- pitch
         [this.oscSaw, this.oscSqr].forEach(osc => {
@@ -149,12 +184,16 @@ class TB303 {
             }
         });
 
+        // --- resonance (scheduled so locks land on the step)
+        this.filter.Q.cancelScheduledValues(time);
+        this.filter.Q.setValueAtTime(this._q(resonance), time);
+
         // --- filter envelope (not retriggered on legato notes — the glide keeps the running envelope)
         if (!legato) {
-            const envAmount = (this.envMod / 100) * 5200 * (accent ? 1 + 0.9 * acc : 1);
-            const base = this.cutoff;
+            const envAmount = (envMod / 100) * 5200 * (accent ? 1 + 0.9 * acc : 1);
+            const base = cutoff;
             const peak = Math.min(base + envAmount, 16000);
-            const dec = Math.max(0.03, this.decay * (accent ? 0.75 : 1));
+            const dec = Math.max(0.03, decay * (accent ? 0.75 : 1));
             const fq = this.filter.frequency;
             fq.cancelScheduledValues(time);
             fq.setValueAtTime(peak, time);
@@ -171,7 +210,6 @@ class TB303 {
             g.setValueAtTime(0, time);
             g.linearRampToValueAtTime(vol, time + 0.004);
         }
-        // Release — for tied notes the following legato trigger cancels this before it happens.
         const end = time + gate;
         g.setTargetAtTime(0, end, tie ? 0.02 : 0.01);
 

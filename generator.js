@@ -4,13 +4,17 @@
  *   - Beats come from style templates (fixed kick / backbeat skeleton + weighted extras, capped)
  *   - Bass lines are motif based: an 8-step cell repeated with a variation, in one key / scale,
  *     root-heavy like real acid lines, with slides only between adjacent notes
+ *   - Chord stabs follow a scale-degree progression across the four patterns
  *   - compose() builds 4 coherent patterns (A1 base, A2 alt, B1 build, B2 fill) for chain playback
+ *   - arrange() lays those patterns out as a 32 / 64 bar song with mutes and filter sweeps
  *
- * 808 cells: 0 = off, 1 = on, 2 = accent
+ * 808 cells: 0 = off, 1 = on, 2 = accent.  Per-step extras (probability / ratchet) ride along as a
+ * non-enumerable `__ext` property: ext[instrument][step] = { p: 0..100, r: 1..4 }.
  */
 const MusicGen = (() => {
     const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
     const INSTRUMENTS = ['kick', 'snare', 'clap', 'hihat_c', 'hihat_o', 'tom_lo', 'tom_hi', 'cymbal', 'rimshot', 'cowbell'];
+    const KIT_CAPABLE = ['kick', 'snare', 'clap', 'hihat_c', 'hihat_o', 'tom_lo', 'tom_hi', 'cymbal', 'rimshot'];
 
     const SCALES = {
         minorPenta: { name: 'MINOR PENTA', iv: [0, 3, 5, 7, 10] },
@@ -21,6 +25,20 @@ const MusicGen = (() => {
         blues:      { name: 'BLUES',       iv: [0, 3, 5, 6, 7, 10] },
         majorPenta: { name: 'MAJOR PENTA', iv: [0, 2, 4, 7, 9] }
     };
+
+    const CHORDS = {
+        min:  { name: 'm',    iv: [0, 3, 7] },
+        maj:  { name: 'M',    iv: [0, 4, 7] },
+        min7: { name: 'm7',   iv: [0, 3, 7, 10] },
+        maj7: { name: 'M7',   iv: [0, 4, 7, 11] },
+        dom7: { name: '7',    iv: [0, 4, 7, 10] },
+        sus2: { name: 'sus2', iv: [0, 2, 7] },
+        sus4: { name: 'sus4', iv: [0, 5, 7] },
+        m9:   { name: 'm9',   iv: [0, 3, 7, 14] },
+        dim:  { name: 'dim',  iv: [0, 3, 6] },
+        pow:  { name: '5',    iv: [0, 7, 12] }
+    };
+    const CHORD_KEYS = Object.keys(CHORDS);
 
     // How attractive each interval (semitones above root) is for a bass line
     const INTERVAL_WEIGHT = { 0: 10, 7: 4, 10: 3, 3: 3, 5: 2, 12: 2, 2: 1.2, 8: 1.2, 9: 1, 1: 1.3, 6: 1.5, 11: 0.7, 4: 2 };
@@ -33,7 +51,11 @@ const MusicGen = (() => {
             clapP: 0.85, snareP: 0.3, hatModes: ['off8', '16', '8', 'off8-16'], openP: 0.55,
             perc: { rimshot: { p: 0.12, max: 3 }, cowbell: { p: 0.05, max: 1 }, tom_lo: { p: 0.06, max: 1 }, tom_hi: { p: 0.06, max: 1 } },
             cymbalP: 0.3,
-            synth: { cutoff: [350, 1400], resonance: [8, 20], envMod: [40, 80], decay: [0.18, 0.45], accent: [50, 85], sawP: 0.7 }
+            synth: { cutoff: [350, 1400], resonance: [8, 20], envMod: [40, 80], decay: [0.18, 0.45], accent: [50, 85], sawP: 0.7 },
+            stab: { p: 0.55, oct: [2, 3], rhythms: [[6, 14], [0], [3, 11], [10], [2, 6, 10, 14]],
+                prog: [[0, 0, 0, 0], [0, 0, 3, 0], [0, 0, 4, 3], [0, 4, 0, 3]], seventhP: 0.3,
+                cutoff: [500, 1600], decay: [0.12, 0.3], release: [0.1, 0.3], chorus: [20, 60] },
+            kit: { kick: 0.5, snare: 0.5, clap: 0.5, hihat_c: 0.6, hihat_o: 0.6, rimshot: 0.3, cymbal: 0.4 }
         },
         house: {
             name: 'HOUSE', bpm: [120, 128], swing: [8, 25], density: ['sparse', 'mid'],
@@ -42,7 +64,11 @@ const MusicGen = (() => {
             clapP: 0.95, snareP: 0.15, hatModes: ['off8', 'off8-16', '16'], openP: 0.85,
             perc: { rimshot: { p: 0.12, max: 3 }, cowbell: { p: 0.1, max: 2 }, tom_lo: { p: 0.05, max: 1 }, tom_hi: { p: 0.08, max: 2 } },
             cymbalP: 0.25,
-            synth: { cutoff: [300, 1000], resonance: [5, 14], envMod: [30, 60], decay: [0.2, 0.5], accent: [40, 70], sawP: 0.6 }
+            synth: { cutoff: [300, 1000], resonance: [5, 14], envMod: [30, 60], decay: [0.2, 0.5], accent: [40, 70], sawP: 0.6 },
+            stab: { p: 0.9, oct: [3, 3, 4], rhythms: [[2, 6, 10, 14], [2, 10], [6, 14], [3, 11], [2, 6, 10]],
+                prog: [[0, 0, 3, 4], [0, 5, 3, 4], [0, 3, 4, 0], [0, 2, 3, 4], [0, 0, 5, 4]], seventhP: 0.65,
+                cutoff: [900, 2600], decay: [0.15, 0.35], release: [0.15, 0.4], chorus: [40, 80] },
+            kit: { kick: 0.4, clap: 0.7, hihat_c: 0.7, hihat_o: 0.7, rimshot: 0.3 }
         },
         acid: {
             name: 'ACID', bpm: [130, 145], swing: [0, 10], density: ['mid', 'dense'],
@@ -51,7 +77,11 @@ const MusicGen = (() => {
             clapP: 0.8, snareP: 0.5, hatModes: ['16', 'off8-16', 'off8'], openP: 0.6,
             perc: { rimshot: { p: 0.15, max: 3 }, cowbell: { p: 0.04, max: 1 }, tom_lo: { p: 0.05, max: 1 }, tom_hi: { p: 0.05, max: 1 } },
             cymbalP: 0.3,
-            synth: { cutoff: [450, 1800], resonance: [12, 25], envMod: [55, 95], decay: [0.15, 0.4], accent: [60, 95], sawP: 0.6 }
+            synth: { cutoff: [450, 1800], resonance: [12, 25], envMod: [55, 95], decay: [0.15, 0.4], accent: [60, 95], sawP: 0.6 },
+            stab: { p: 0.35, oct: [2, 3], rhythms: [[10], [2, 10], [6]],
+                prog: [[0, 0, 0, 0], [0, 0, 3, 0]], seventhP: 0.2,
+                cutoff: [400, 1200], decay: [0.1, 0.25], release: [0.08, 0.2], chorus: [10, 40] },
+            kit: { hihat_c: 0.15, hihat_o: 0.15 }
         },
         electro: {
             name: 'ELECTRO', bpm: [118, 132], swing: [0, 8], density: ['sparse', 'mid'],
@@ -60,7 +90,11 @@ const MusicGen = (() => {
             clapP: 0.6, snareP: 0.95, hatModes: ['8', 'off8-16', '16'], openP: 0.4,
             perc: { rimshot: { p: 0.1, max: 2 }, cowbell: { p: 0.18, max: 2 }, tom_lo: { p: 0.1, max: 2 }, tom_hi: { p: 0.12, max: 2 } },
             cymbalP: 0.2,
-            synth: { cutoff: [250, 1200], resonance: [6, 16], envMod: [35, 70], decay: [0.15, 0.4], accent: [40, 75], sawP: 0.5 }
+            synth: { cutoff: [250, 1200], resonance: [6, 16], envMod: [35, 70], decay: [0.15, 0.4], accent: [40, 75], sawP: 0.5 },
+            stab: { p: 0.55, oct: [3, 4], rhythms: [[3, 11], [6], [3, 11, 14], [7, 15]],
+                prog: [[0, 0, 3, 0], [0, 3, 0, 4], [0, 0, 5, 3]], seventhP: 0.4,
+                cutoff: [600, 2000], decay: [0.1, 0.3], release: [0.1, 0.3], chorus: [30, 70] },
+            kit: {}
         },
         minimal: {
             name: 'MINIMAL', bpm: [124, 132], swing: [0, 15], density: ['sparse'],
@@ -69,7 +103,11 @@ const MusicGen = (() => {
             clapP: 0.35, snareP: 0.05, hatModes: ['off8', '8'], openP: 0.35,
             perc: { rimshot: { p: 0.18, max: 3 }, cowbell: { p: 0.06, max: 1 }, tom_lo: { p: 0.1, max: 1 }, tom_hi: { p: 0.08, max: 1 } },
             cymbalP: 0.1,
-            synth: { cutoff: [200, 800], resonance: [4, 12], envMod: [20, 50], decay: [0.25, 0.6], accent: [30, 60], sawP: 0.5 }
+            synth: { cutoff: [200, 800], resonance: [4, 12], envMod: [20, 50], decay: [0.25, 0.6], accent: [30, 60], sawP: 0.5 },
+            stab: { p: 0.4, oct: [3, 4], rhythms: [[14], [7], [10], [6, 14]],
+                prog: [[0, 0, 0, 0], [0, 0, 0, 3]], seventhP: 0.5,
+                cutoff: [400, 1200], decay: [0.15, 0.4], release: [0.2, 0.5], chorus: [30, 70] },
+            kit: { hihat_c: 0.5, hihat_o: 0.5, rimshot: 0.3 }
         },
         breaks: {
             name: 'BREAKS', bpm: [92, 104], swing: [10, 30], density: ['mid'],
@@ -78,7 +116,11 @@ const MusicGen = (() => {
             clapP: 0.3, snareP: 0.98, hatModes: ['8', '16', 'off8-16'], openP: 0.4,
             perc: { rimshot: { p: 0.1, max: 2 }, cowbell: { p: 0.06, max: 1 }, tom_lo: { p: 0.1, max: 2 }, tom_hi: { p: 0.1, max: 2 } },
             cymbalP: 0.3,
-            synth: { cutoff: [250, 900], resonance: [5, 14], envMod: [30, 65], decay: [0.2, 0.5], accent: [40, 70], sawP: 0.7 }
+            synth: { cutoff: [250, 900], resonance: [5, 14], envMod: [30, 65], decay: [0.2, 0.5], accent: [40, 70], sawP: 0.7 },
+            stab: { p: 0.6, oct: [3, 4], rhythms: [[2, 10], [3, 11], [6, 14], [2, 7, 10]],
+                prog: [[0, 0, 3, 4], [0, 3, 0, 4], [0, 0, 5, 3]], seventhP: 0.6,
+                cutoff: [700, 2200], decay: [0.15, 0.35], release: [0.15, 0.4], chorus: [30, 70] },
+            kit: { snare: 0.6, kick: 0.4 }
         }
     };
 
@@ -99,9 +141,31 @@ const MusicGen = (() => {
     const clone808 = p => {
         const c = {};
         Object.keys(p).forEach(k => { c[k] = p[k].slice(); });
+        if (p.__ext) setExtAll(c, JSON.parse(JSON.stringify(p.__ext)));
         return c;
     };
-    const cloneLine = l => l.map(s => ({ ...s }));
+    const cloneLine = l => l.map(s => ({ ...s, lock: s.lock ? { ...s.lock } : null }));
+
+    /** Attach per-step extras without polluting Object.keys(pattern). */
+    function setExtAll(P, ext) {
+        Object.defineProperty(P, '__ext', { value: ext, enumerable: false, configurable: true, writable: true });
+        return P;
+    }
+    /** Drop extras that point at empty cells (after toggles / clears). */
+    function cleanExt(P) {
+        const ext = P.__ext;
+        if (!ext) return P;
+        Object.keys(ext).forEach(inst => {
+            Object.keys(ext[inst]).forEach(step => { if (!P[inst] || !P[inst][step]) delete ext[inst][step]; });
+            if (!Object.keys(ext[inst]).length) delete ext[inst];
+        });
+        return P;
+    }
+    function setExt(P, inst, step, data) {
+        if (!P.__ext) setExtAll(P, {});
+        if (!P.__ext[inst]) P.__ext[inst] = {};
+        P.__ext[inst][step] = { ...(P.__ext[inst][step] || {}), ...data };
+    }
 
     function empty808() {
         const p = {};
@@ -110,12 +174,22 @@ const MusicGen = (() => {
     }
 
     function emptyStep() {
-        return { active: false, note: 'C', octave: 2, accent: false, slide: false };
+        return { active: false, note: 'C', octave: 2, accent: false, slide: false, prob: 100, ratchet: 1, lock: null };
     }
 
     function emptyLine() {
         const l = [];
         for (let i = 0; i < 16; i++) l.push(emptyStep());
+        return l;
+    }
+
+    function emptyStabStep() {
+        return { active: false, note: 'C', octave: 3, chord: 'min', accent: false, prob: 100 };
+    }
+
+    function emptyStabLine() {
+        const l = [];
+        for (let i = 0; i < 16; i++) l.push(emptyStabStep());
         return l;
     }
 
@@ -125,17 +199,14 @@ const MusicGen = (() => {
         const P = empty808();
         const set = (inst, i, v = 1) => { if (i >= 0 && i < 16) P[inst][i] = Math.max(P[inst][i], v); };
 
-        // Kick skeleton (step 0 always, accented)
         pick(S.kicks).forEach(i => set('kick', i, i === 0 ? 2 : 1));
         if (S.kickExtra.length && chance(S.kickExtraP)) pick(S.kickExtra).forEach(i => set('kick', i, 1));
 
-        // Backbeat
         let hasBackbeat = false;
         if (chance(S.clapP)) { [4, 12].forEach(i => set('clap', i, 1)); hasBackbeat = true; }
         if (chance(S.snareP)) { [4, 12].forEach(i => set('snare', i, 1)); hasBackbeat = true; }
         if (!hasBackbeat && chance(0.6)) { [4, 12].forEach(i => set('rimshot', i, 1)); hasBackbeat = true; }
 
-        // Hats
         const mode = pick(S.hatModes);
         for (let i = 0; i < 16; i++) {
             const even = i % 2 === 0;
@@ -143,10 +214,9 @@ const MusicGen = (() => {
                 case 'off8':    if (i % 4 === 2) set('hihat_c', i, 1); break;
                 case '8':       if (even) set('hihat_c', i, i % 4 === 0 ? 2 : 1); break;
                 case '16':      set('hihat_c', i, i % 4 === 2 ? 2 : 1); break;
-                case 'off8-16': if (even) set('hihat_c', i, i % 4 === 2 ? 2 : 1); else if (chance(0.4)) set('hihat_c', i, 1); break;
+                case 'off8-16': if (even) set('hihat_c', i, i % 4 === 2 ? 2 : 1); else if (chance(0.4)) { set('hihat_c', i, 1); setExt(P, 'hihat_c', i, { p: 70 }); } break;
             }
         }
-        // Open hats on offbeats, choke the closed hat there
         let openCount = 0;
         [2, 6, 10, 14].forEach(i => {
             if (openCount < 4 && chance(S.openP)) {
@@ -156,11 +226,9 @@ const MusicGen = (() => {
             }
         });
         if (mode === 'off8' && openCount === 4) {
-            // all offbeats open: keep the pattern from becoming nothing but open hats
             [6, 14].forEach(i => { P.hihat_o[i] = 0; P.hihat_c[i] = 1; });
         }
 
-        // Percussion extras (capped)
         Object.keys(S.perc).forEach(inst => {
             const cfg = S.perc[inst];
             let count = 0;
@@ -174,7 +242,7 @@ const MusicGen = (() => {
         });
 
         if (chance(S.cymbalP)) set('cymbal', 0, 1);
-        return P;
+        return cleanExt(P);
     }
 
     function variateBeat(base, kind) {
@@ -184,7 +252,11 @@ const MusicGen = (() => {
 
         if (kind === 'alt') {
             const n = rndInt(1, 2);
-            for (let k = 0; k < n; k++) toggle('hihat_c', pick(odd));
+            for (let k = 0; k < n; k++) {
+                const i = pick(odd);
+                toggle('hihat_c', i);
+                if (P.hihat_c[i]) setExt(P, 'hihat_c', i, { p: 60 });
+            }
             if (chance(0.4)) P.rimshot[pick(odd)] = 1;
             if (chance(0.3)) {
                 const from = [2, 6, 10, 14].filter(i => P.hihat_o[i]);
@@ -200,6 +272,7 @@ const MusicGen = (() => {
             const perc = pick(['cowbell', 'tom_hi', 'tom_lo', 'rimshot']);
             for (let k = 0; k < rndInt(1, 2); k++) P[perc][pick(odd)] = 1;
             if (chance(0.5)) [2, 6, 10, 14].forEach(i => { if (chance(0.7)) { P.hihat_o[i] = 1; P.hihat_c[i] = 0; } });
+            if (chance(0.5)) { P.hihat_c[15] = 1; P.hihat_o[15] = 0; setExt(P, 'hihat_c', 15, { r: pick([2, 3]) }); }
             P.cymbal = new Array(16).fill(0);
         }
 
@@ -211,16 +284,21 @@ const MusicGen = (() => {
             switch (fill) {
                 case 'snareRoll':
                     P.snare[12] = 2; P.snare[13] = 1; P.snare[14] = 2; P.snare[15] = 1;
+                    setExt(P, 'snare', 14, { r: 2 });
+                    setExt(P, 'snare', 15, { r: pick([2, 3, 4]) });
                     break;
                 case 'tomRun':
                     P.tom_hi[12] = 1; P.tom_hi[13] = 1; P.tom_lo[14] = 1; P.tom_lo[15] = 2;
+                    if (chance(0.5)) setExt(P, 'tom_hi', 13, { r: 2 });
                     break;
                 case 'clapStack':
                     P.clap[12] = 1; P.clap[14] = 1; P.clap[15] = 2; P.snare[13] = 1; P.snare[15] = 1;
+                    setExt(P, 'clap', 15, { r: 2 });
                     break;
                 case 'hatRoll':
                     for (let i = 12; i < 16; i++) { P.hihat_c[i] = i === 12 ? 2 : 1; P.hihat_o[i] = 0; }
                     P.hihat_o[15] = 1; P.hihat_c[15] = 0;
+                    setExt(P, 'hihat_c', 14, { r: 2 });
                     break;
                 case 'dropout':
                     INSTRUMENTS.forEach(inst => { for (let i = 13; i < 16; i++) P[inst][i] = 0; });
@@ -229,7 +307,7 @@ const MusicGen = (() => {
             }
             P.cymbal = new Array(16).fill(0);
         }
-        return P;
+        return cleanExt(P);
     }
 
     // ------------------------------------------------------------ bass lines
@@ -258,7 +336,6 @@ const MusicGen = (() => {
         const gateP = GATE_P[density] || GATE_P.mid;
         if (baseOct === null) baseOct = chance(0.6) ? 1 : 2;
 
-        // 8-step motif cell
         const cell = [];
         let nonRootRun = 0;
         for (let i = 0; i < 8; i++) {
@@ -279,7 +356,6 @@ const MusicGen = (() => {
             cell.push(s);
         }
 
-        // Second half = motif with a variation + optional turnaround
         const half2 = cloneLine(cell);
         const activeIdx = half2.map((s, i) => s.active ? i : -1).filter(i => i >= 0);
         for (let k = 0; k < rndInt(1, 2) && activeIdx.length; k++) {
@@ -289,7 +365,6 @@ const MusicGen = (() => {
             half2[i].octave = Math.min(3, p.octave);
         }
         if (chance(0.55)) {
-            // turnaround on the last two steps leading back to the top (scale tones only)
             const fifth = iv.includes(7) ? 7 : iv[Math.floor(iv.length / 2)];
             const top = iv[iv.length - 1];
             const third = iv[1];
@@ -301,12 +376,11 @@ const MusicGen = (() => {
                 half2[i].octave = Math.min(3, p.octave);
             });
             half2[6].slide = true;
-            if (chance(0.5)) half2[7].slide = true; // tie into bar 1 of the loop
+            if (chance(0.5)) half2[7].slide = true;
         }
 
         const line = [...cell, ...half2];
 
-        // Make sure there is enough material
         let notes = line.filter(s => s.active).length;
         for (const i of [0, 8, 4, 12, 2, 10, 6, 14]) {
             if (notes >= MIN_NOTES[density]) break;
@@ -319,6 +393,9 @@ const MusicGen = (() => {
             }
         }
 
+        // a few ghost notes on weak steps get a probability so the loop breathes
+        line.forEach((s, i) => { if (s.active && i % 4 === 3 && !s.accent && chance(0.3)) s.prob = pick([60, 75]); });
+
         finishLine(line, density);
         return line;
     }
@@ -330,6 +407,9 @@ const MusicGen = (() => {
         for (let i = 0; i < 16; i++) {
             const cur = line[i];
             const next = line[(i + 1) % 16];
+            if (cur.prob === undefined) cur.prob = 100;
+            if (!cur.ratchet) cur.ratchet = 1;
+            if (cur.lock === undefined) cur.lock = null;
             if (!cur.active || !next.active) { cur.slide = false; continue; }
             if (cur.slide) { slides++; continue; }
             const differs = cur.note !== next.note || cur.octave !== next.octave;
@@ -348,7 +428,7 @@ const MusicGen = (() => {
                 if (line[i].active) { line[i].accent = true; if (accentIdx().length >= 2) break; }
             }
         }
-        line.forEach(s => { if (!s.active) { s.accent = false; s.slide = false; } });
+        line.forEach(s => { if (!s.active) { s.accent = false; s.slide = false; s.prob = 100; s.ratchet = 1; s.lock = null; } });
         return line;
     }
 
@@ -375,7 +455,6 @@ const MusicGen = (() => {
         });
         finishLine(out, density);
         if (JSON.stringify(out) === before) {
-            // guarantee an audible difference: re-pitch one note (not the downbeat)
             const idx = out.map((s, i) => s.active && i !== 0 ? i : -1).filter(i => i >= 0);
             if (idx.length) {
                 const s = out[pick(idx)];
@@ -400,7 +479,6 @@ const MusicGen = (() => {
         });
     }
 
-    /** Snap any line to a key / scale (used by Euclidean + mutate helpers). */
     function quantizeLine(line, root, scale) {
         const iv = (SCALES[scale] || SCALES.minorPenta).iv;
         return line.map(s => {
@@ -412,6 +490,123 @@ const MusicGen = (() => {
         });
     }
 
+    // ------------------------------------------------------------ chords / stabs
+    /** Triad (optionally with a 7th) on scale degree `d`, snapped to the scale's own tones. */
+    function chordForDegree(iv, d, seventhP = 0.4) {
+        const n = iv.length;
+        const semis = iv[((d % n) + n) % n];
+        const inScale = x => iv.includes(((semis + x) % 12 + 12) % 12);
+        let third = inScale(3) ? 3 : (inScale(4) ? 4 : 0);
+        let fifth = inScale(7) ? 7 : (inScale(6) && third === 3 ? 6 : 7);
+        let type;
+        if (third === 3 && fifth === 7) type = 'min';
+        else if (third === 4 && fifth === 7) type = 'maj';
+        else if (third === 3 && fifth === 6) type = 'dim';
+        else if (inScale(2)) type = 'sus2';
+        else if (inScale(5)) type = 'sus4';
+        else type = 'pow';
+        if (chance(seventhP)) {
+            if (type === 'min' && inScale(10)) type = chance(0.25) && inScale(2) ? 'm9' : 'min7';
+            else if (type === 'maj' && inScale(11)) type = 'maj7';
+            else if (type === 'maj' && inScale(10)) type = 'dom7';
+        }
+        return { semis, type };
+    }
+
+    function stabPitch(root, semis, oct) {
+        let octave = oct + Math.floor((root + semis) / 12);
+        octave = Math.max(2, Math.min(5, octave));
+        return { note: NOTES[(root + semis) % 12], octave };
+    }
+
+    /**
+     * Four stab patterns following a progression. Returns [] of 4 lines; all empty when the style skips stabs.
+     */
+    function generateStabs({ root = 9, scale = 'minorPenta', style = 'house', force = false } = {}) {
+        const S = STYLES[style] || STYLES.house;
+        const cfg = S.stab;
+        const lines = [emptyStabLine(), emptyStabLine(), emptyStabLine(), emptyStabLine()];
+        if (!force && !chance(cfg.p)) return lines;
+
+        const iv = (SCALES[scale] || SCALES.minorPenta).iv;
+        const oct = pick(cfg.oct);
+        const rhythm = pick(cfg.rhythms);
+        const prog = pick(cfg.prog);
+        const chords = prog.map(d => chordForDegree(iv, d, cfg.seventhP));
+
+        lines.forEach((line, pi) => {
+            const ch = chords[pi];
+            let steps = rhythm.slice();
+            if (pi === 1 && rhythm.length > 2 && chance(0.5)) steps = steps.filter((_, k) => k !== 1);   // A2: thin out
+            if (pi === 2 && chance(0.5)) steps.push(pick([15, 13, 7]));                                  // B1: extra push
+            steps = [...new Set(steps)].filter(i => i >= 0 && i < 16);
+            steps.forEach((i, k) => {
+                const p = stabPitch(root, ch.semis, oct);
+                const s = line[i];
+                s.active = true;
+                s.note = p.note;
+                s.octave = p.octave;
+                s.chord = ch.type;
+                s.accent = k === 0 || (i % 8 === 0);
+                s.prob = 100;
+            });
+            if (pi === 3) {
+                // B2: pickup into the top of the loop with the first chord
+                const back = chords[0];
+                const p = stabPitch(root, back.semis, oct);
+                const i = pick([15, 14]);
+                line[i] = { active: true, note: p.note, octave: p.octave, chord: back.type, accent: false, prob: 100 };
+            }
+        });
+        return lines;
+    }
+
+    function finishStabLine(line) {
+        return line.map(s => ({
+            active: !!s.active,
+            note: NOTES.includes(s.note) ? s.note : 'C',
+            octave: Math.max(2, Math.min(5, parseInt(s.octave) || 3)),
+            chord: CHORDS[s.chord] ? s.chord : 'min',
+            accent: !!s.active && !!s.accent,
+            prob: s.active ? Math.max(0, Math.min(100, parseInt(s.prob ?? 100))) : 100
+        }));
+    }
+
+    function transposeStabs(line, semis) {
+        return line.map(s => {
+            if (!s.active) return { ...s };
+            let midi = s.octave * 12 + NOTES.indexOf(s.note) + semis;
+            let octave = Math.floor(midi / 12);
+            while (octave > 5) { octave--; midi -= 12; }
+            while (octave < 2) { octave++; midi += 12; }
+            return { ...s, note: NOTES[((midi % 12) + 12) % 12], octave };
+        });
+    }
+
+    function stabParams(styleKey) {
+        const S = (STYLES[styleKey] || STYLES.house).stab;
+        return {
+            cutoff: Math.round(rnd(...S.cutoff)),
+            resonance: Math.round(rnd(2, 8)),
+            envMod: Math.round(rnd(30, 75)),
+            decay: Math.round(rnd(...S.decay) * 100) / 100,
+            release: Math.round(rnd(...S.release) * 100) / 100,
+            detune: Math.round(rnd(6, 18)),
+            chorus: Math.round(rnd(...S.chorus)),
+            waveform: chance(0.8) ? 'sawtooth' : 'square'
+        };
+    }
+
+    // ------------------------------------------------------------ kits
+    function kitFor(styleKey) {
+        const S = STYLES[styleKey] || STYLES.techno;
+        const kit = {};
+        KIT_CAPABLE.forEach(id => { kit[id] = chance(S.kit[id] || 0) ? '909' : '808'; });
+        // hats travel together
+        kit.hihat_o = kit.hihat_c;
+        return kit;
+    }
+
     // ------------------------------------------------------------ compose
     function synthParams(styleKey) {
         const S = (STYLES[styleKey] || STYLES.techno).synth;
@@ -421,6 +616,7 @@ const MusicGen = (() => {
             envMod: Math.round(rnd(...S.envMod)),
             decay: Math.round(rnd(...S.decay) * 100) / 100,
             accent: Math.round(rnd(...S.accent)),
+            drive: Math.round(rnd(10, 45)),
             waveform: chance(S.sawP) ? 'sawtooth' : 'square'
         };
     }
@@ -441,7 +637,7 @@ const MusicGen = (() => {
         const L2 = variateLine(L1, 0.25, { root, scale, density });
         let L3;
         if (chance(0.5)) {
-            L3 = finishLine(transposeLine(L1, pick([5, 7, -5, 3])), density);
+            L3 = finishLine(quantizeLine(transposeLine(L1, pick([5, 7, -5, 3])), root, scale), density);
         } else {
             L3 = variateLine(L1, 0.45, { root, scale, density });
         }
@@ -457,17 +653,60 @@ const MusicGen = (() => {
             swing: rndInt(...S.swing),
             patterns808: beats,
             patterns303: lines,
+            patternsStab: generateStabs({ root, scale, style: styleKey }),
             synth: synthParams(styleKey),
+            stab: stabParams(styleKey),
+            kit: kitFor(styleKey),
             delay: { on: chance(0.6), time: pick([3, 6, 2, 3]), feedback: rndInt(28, 48), mix: rndInt(14, 28) }
         };
     }
 
+    // ------------------------------------------------------------ arrangement
+    const ALL_BUT = (keep) => ['kick', 'snare', 'clap', 'hihat_c', 'hihat_o', 'tom_lo', 'tom_hi', 'cymbal', 'rimshot', 'cowbell',
+        's1', 's2', 's3', 's4', '303', 'stab'].filter(id => !keep.includes(id));
+
+    /**
+     * Song layout over the four patterns. Sections: { name, start, len, patterns, mutes, filter:[from,to]|null, delay, reverb }.
+     * `patterns` cycles every chainBars bars inside the section.
+     */
+    function arrange({ bars = 32, chainBars = 4 } = {}) {
+        const sec = (name, start, len, patterns, mutes, extra = {}) => ({ name, start, len, patterns, mutes, filter: null, delay: null, reverb: null, ...extra });
+        const introKeep = ['kick', 'hihat_c', 'hihat_o', 'rimshot', 's1'];
+        const buildMutes = ['stab', 'cymbal'];
+        const breakMutes = ['kick', 'tom_lo', 'tom_hi', 's1', 's2'];
+        let sections;
+        if (bars >= 64) {
+            sections = [
+                sec('INTRO',  0,  8, [0],    ALL_BUT(introKeep), { filter: [-75, 0] }),
+                sec('BUILD',  8,  8, [1],    buildMutes,         { delay: true }),
+                sec('DROP',   16, 16, [2, 3], [],                 { delay: true }),
+                sec('BREAK',  32, 8, [0],    breakMutes,         { filter: [0, 70], reverb: true }),
+                sec('BUILD',  40, 8, [1],    ['stab'],           { filter: [-55, 0], delay: true }),
+                sec('DROP',   48, 12, [2, 3], [],                 { delay: true }),
+                sec('OUTRO',  60, 4, [0],    ['303', 'stab', 'snare', 'clap', 'cowbell'], { filter: [0, -85] })
+            ];
+            bars = 64;
+        } else {
+            sections = [
+                sec('INTRO',  0,  8, [0],    ALL_BUT(introKeep), { filter: [-75, 0] }),
+                sec('BUILD',  8,  8, [1],    buildMutes,         { delay: true }),
+                sec('DROP',   16, 8, [2, 3], [],                 { delay: true }),
+                sec('BREAK',  24, 4, [0],    breakMutes,         { filter: [0, 65], reverb: true }),
+                sec('DROP',   28, 4, [3],    [],                 { delay: true })
+            ];
+            bars = 32;
+        }
+        return { bars, chainBars, sections };
+    }
+
     return {
-        NOTES, INSTRUMENTS, SCALES, STYLES,
-        empty808, emptyLine, emptyStep,
+        NOTES, INSTRUMENTS, KIT_CAPABLE, SCALES, STYLES, CHORDS, CHORD_KEYS,
+        empty808, emptyLine, emptyStep, emptyStabStep, emptyStabLine,
+        setExt, setExtAll, cleanExt, clone808, cloneLine,
         generateBeat, variateBeat,
         generateLine, variateLine, transposeLine, quantizeLine, finishLine,
-        synthParams, compose,
+        chordForDegree, generateStabs, finishStabLine, transposeStabs, stabParams,
+        kitFor, synthParams, compose, arrange,
         rnd, rndInt, chance, pick
     };
 })();

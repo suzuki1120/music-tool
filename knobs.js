@@ -4,7 +4,9 @@
  *  - drag vertically (Shift = fine), mouse wheel, arrow keys, double-click resets to the initial value
  *  - the original <input> stays in the DOM: reading / writing .value and listening to 'input' keep working
  *  - Knobs.set(input, value, { emit }) updates value + visual and optionally dispatches 'input'
- *  - data-format: int | pct | hz | sec | bpm | x | custom via data-unit
+ *  - data-format: int | pct | hz | sec | ms | bpm | x | semi | pan | filter | float1 | float2 | custom via data-unit
+ *  - data-bipolar: the value arc grows from the centre (pan, filter, pitch)
+ *  - data-size: s | l
  */
 const Knobs = (() => {
     const registry = new WeakMap();
@@ -18,10 +20,14 @@ const Knobs = (() => {
             case 'pct': return Math.round(v) + '%';
             case 'hz': return v >= 1000 ? (v / 1000).toFixed(2).replace(/\.?0+$/, '') + 'k' : Math.round(v) + 'Hz';
             case 'sec': return (v < 1 ? Math.round(v * 1000) + 'ms' : v.toFixed(2) + 's');
+            case 'ms': return Math.round(v) + 'ms';
             case 'float1': return v.toFixed(1) + unit;
             case 'float2': return v.toFixed(2) + unit;
             case 'x': return v.toFixed(1) + '×';
             case 'div': return '1/' + Math.round(v * 4);
+            case 'semi': return (v > 0 ? '+' : '') + Math.round(v) + 'st';
+            case 'pan': { const p = Math.round(v); return p === 0 ? 'C' : (p < 0 ? 'L' + Math.abs(p) : 'R' + p); }
+            case 'filter': { const p = Math.round(v); return p === 0 ? 'FLAT' : (p < 0 ? 'LP ' + Math.abs(p) : 'HP ' + p); }
             default: return Math.round(v) + unit;
         }
     }
@@ -43,7 +49,14 @@ const Knobs = (() => {
         const t = max > min ? (v - min) / (max - min) : 0;
         const angle = MIN_ANGLE + t * (MAX_ANGLE - MIN_ANGLE);
         k.el.style.setProperty('--angle', angle + 'deg');
-        k.el.style.setProperty('--sweep', (t * 270) + 'deg');
+        if (k.bipolar) {
+            const a = Math.min(t, 0.5) * 270, b = Math.max(t, 0.5) * 270;
+            k.el.style.setProperty('--arc-start', a + 'deg');
+            k.el.style.setProperty('--arc-end', b + 'deg');
+        } else {
+            k.el.style.setProperty('--arc-start', '0deg');
+            k.el.style.setProperty('--arc-end', (t * 270) + 'deg');
+        }
         k.el.setAttribute('aria-valuenow', v);
         k.el.setAttribute('aria-valuetext', fmt(input, v));
         k.out.textContent = fmt(input, v);
@@ -78,7 +91,7 @@ const Knobs = (() => {
         else input.insertAdjacentElement('afterend', out);
 
         const initial = parseFloat(input.dataset.default ?? input.value);
-        registry.set(input, { el, out, initial });
+        registry.set(input, { el, out, initial, bipolar: input.dataset.bipolar !== undefined });
 
         // --- drag
         let startY = 0, startVal = 0, dragging = false;
@@ -90,6 +103,7 @@ const Knobs = (() => {
             el.setPointerCapture(e.pointerId);
             el.classList.add('is-dragging');
             document.body.classList.add('knob-dragging');
+            el.dispatchEvent(new CustomEvent('knobgrab', { bubbles: true, detail: { input } }));
             e.preventDefault();
         });
         el.addEventListener('pointermove', (e) => {
@@ -152,7 +166,6 @@ const Knobs = (() => {
             emit(input);
         });
 
-        // external updates
         input.addEventListener('input', () => update(input));
         input.addEventListener('change', () => update(input));
         update(input);
@@ -170,10 +183,24 @@ const Knobs = (() => {
         if (doEmit) emit(input);
     }
 
+    /** Map a normalised 0..1 value (MIDI CC) onto the knob's range. */
+    function setNormalized(input, t, opts) {
+        if (typeof input === 'string') input = document.getElementById(input);
+        if (!input) return;
+        const min = parseFloat(input.min), max = parseFloat(input.max);
+        set(input, min + (max - min) * Math.max(0, Math.min(1, t)), opts);
+    }
+
     function refresh(input) {
         if (typeof input === 'string') input = document.getElementById(input);
         if (input) update(input);
     }
 
-    return { enhance, enhanceAll, set, refresh, format: fmt };
+    function element(input) {
+        if (typeof input === 'string') input = document.getElementById(input);
+        const k = input ? registry.get(input) : null;
+        return k ? k.el : null;
+    }
+
+    return { enhance, enhanceAll, set, setNormalized, refresh, format: fmt, element };
 })();

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SYNTH SEQUENCER — TR-808 / TB-303 Groovebox</title>
-    <meta name="description" content="Browser groovebox: TR-808 drum machine + TB-303 bass line with chaos FX and a musical pattern composer.">
+    <meta name="description" content="Browser groovebox: TR-808/909 drums, TB-303 bass line, chord stabs, sampler, mixer with sidechain, chaos FX, song arranger, MIDI, WAV / JSON export.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
@@ -17,11 +17,12 @@
     <header class="unit unit-transport">
         <div class="brand">
             <div class="brand-name">SYNTH<span>SEQUENCER</span></div>
-            <div class="brand-model">MK-II · RHYTHM COMPOSER + BASS LINE</div>
+            <div class="brand-model">MK-III · RHYTHM COMPOSER + BASS LINE + STAB</div>
             <div class="brand-leds">
                 <span class="led led-power is-on" title="POWER"></span>
                 <span id="ledRun" class="led led-run" title="RUN"></span>
                 <span id="ledBeat" class="led led-beat" title="BEAT"></span>
+                <span id="ledRec" class="led led-rec" title="REC"></span>
             </div>
         </div>
 
@@ -35,12 +36,14 @@
                 <div class="lcd-cells">
                     <div class="lcd-cell"><span class="lcd-label">PATTERN</span><span id="lcdPattern" class="lcd-val">A1</span></div>
                     <div class="lcd-cell"><span class="lcd-label">BAR</span><span id="lcdBar" class="lcd-val">–</span></div>
+                    <div class="lcd-cell"><span class="lcd-label">SECTION</span><span id="lcdSection" class="lcd-val">–</span></div>
                     <div class="lcd-cell"><span class="lcd-label">SWING</span><span id="lcdSwing" class="lcd-val">0%</span></div>
                     <div class="lcd-cell"><span class="lcd-label">KEY</span><span id="lcdKey" class="lcd-val">A MIN.P</span></div>
-                    <div class="lcd-cell"><span class="lcd-label">CHAIN</span><span id="lcdChain" class="lcd-val">OFF</span></div>
+                    <div class="lcd-cell"><span class="lcd-label">MODE</span><span id="lcdChain" class="lcd-val">OFF</span></div>
                 </div>
             </div>
             <div class="lcd-steps" id="lcdSteps"></div>
+            <canvas id="lcdScope" class="lcd-scope" width="400" height="36" title="クリックで SCOPE / SPECTRUM / OFF を切替"></canvas>
             <div class="lcd-msg"><span id="statusText">READY — PRESS PLAY OR COMPOSE</span></div>
         </div>
 
@@ -49,18 +52,27 @@
                 <button id="playBtn" class="hw-btn hw-lg btn-play" title="PLAY / STOP  [SPACE]"><span class="led"></span>PLAY</button>
                 <button id="stopBtn" class="hw-btn hw-lg btn-stop" title="STOP"><span class="led"></span>STOP</button>
             </div>
+            <div class="transport-row">
+                <button id="fillBtn" class="hw-btn hw-md momentary" title="押している間フィルイン  [F]">FILL<small>HOLD</small></button>
+                <button id="recBtn" class="hw-btn hw-md btn-rec" title="WAV 録音 開始 / 停止  [R]"><span class="led"></span>REC</button>
+            </div>
             <div class="transport-row knobs-row">
                 <div class="knob-wrapper">
                     <input type="range" id="bpmSlider" data-knob data-format="int" min="20" max="300" value="128">
                     <label>TEMPO</label>
                 </div>
                 <div class="stepper">
-                    <button id="bpmDown" class="hw-btn hw-xs" title="BPM −1">−</button>
                     <button id="bpmUp" class="hw-btn hw-xs" title="BPM +1">+</button>
+                    <button id="bpmDown" class="hw-btn hw-xs" title="BPM −1">−</button>
+                    <button id="tapBtn" class="hw-btn hw-xs" title="タップテンポ  [T]">TAP</button>
                 </div>
                 <div class="knob-wrapper">
                     <input type="range" id="swingSlider" data-knob data-format="pct" min="0" max="100" value="0">
                     <label>SWING</label>
+                </div>
+                <div class="knob-wrapper">
+                    <input type="range" id="humanizeSlider" data-knob data-format="pct" min="0" max="100" value="0">
+                    <label>HUMAN</label>
                 </div>
             </div>
         </div>
@@ -94,26 +106,53 @@
                     </select>
                 </div>
             </div>
+            <div class="composer-row">
+                <span class="composer-sub">KEEP</span>
+                <div class="switch-pair lock-group">
+                    <button id="lock808" class="hw-btn hw-xs sw lock-btn" title="COMPOSE時にドラムパターンとテンポを維持">808</button>
+                    <button id="lock303" class="hw-btn hw-xs sw lock-btn" title="COMPOSE時にベースラインとキーを維持">303</button>
+                    <button id="lockStab" class="hw-btn hw-xs sw lock-btn" title="COMPOSE時にスタブパターンを維持">STAB</button>
+                    <button id="lockSynth" class="hw-btn hw-xs sw lock-btn" title="COMPOSE時に音色・ディレイ設定を維持">SYNTH</button>
+                </div>
+                <button id="arrangeBtn" class="hw-btn hw-sm btn-gen" title="現在の4パターンから曲構成（イントロ→ビルド→ドロップ→ブレイク）を生成">ARRANGE</button>
+                <select id="songBars" class="hw-select hw-select-sm" title="曲の長さ">
+                    <option value="32" selected>32 BARS</option>
+                    <option value="64">64 BARS</option>
+                </select>
+                <button id="songToggle" class="hw-btn hw-sm" title="SONGモード：アレンジに沿ってミュート・フィルター・パターンを自動操作"><span class="led"></span>SONG</button>
+            </div>
         </div>
     </header>
 
     <!-- ================= MODE SWITCH ================= -->
     <nav class="mode-switch" role="tablist">
         <button id="modeInst" class="mode-btn active" data-mode="instruments" role="tab" aria-selected="true"><span class="led"></span>INSTRUMENTS <kbd>1</kbd></button>
-        <button id="modeFX" class="mode-btn" data-mode="fx" role="tab" aria-selected="false"><span class="led"></span>CHAOS FX <kbd>2</kbd></button>
+        <button id="modeMixer" class="mode-btn" data-mode="mixer" role="tab" aria-selected="false"><span class="led"></span>MIXER <kbd>2</kbd></button>
+        <button id="modeFX" class="mode-btn" data-mode="fx" role="tab" aria-selected="false"><span class="led"></span>CHAOS FX <kbd>3</kbd></button>
+        <button id="modeSystem" class="mode-btn" data-mode="system" role="tab" aria-selected="false"><span class="led"></span>SYSTEM <kbd>4</kbd></button>
     </nav>
 
     <main class="sequencer-container">
 
-        <!-- ================= TR-808 ================= -->
-        <section id="section808" class="unit unit-808 sequencer-section active">
+        <!-- ================= TR-808 / 909 ================= -->
+        <section id="section808" class="unit unit-808 sequencer-section active" data-mode="instruments">
             <div class="unit-head">
                 <div class="unit-title">
                     <span class="unit-badge">TR</span>
-                    <h2>808 <small>RHYTHM COMPOSER</small></h2>
+                    <h2>808<em>/909</em> <small>RHYTHM COMPOSER</small></h2>
                 </div>
                 <div class="unit-tools">
                     <div class="pat-group" id="patBtns808" aria-label="Pattern 808"></div>
+                    <div class="switch-pair edit-switch" id="editMode808" title="ステップ編集モード">
+                        <button class="hw-btn hw-sm sw edit-btn active" data-edit="trig" title="トリガー入力">TRIG</button>
+                        <button class="hw-btn hw-sm sw edit-btn" data-edit="prob" title="ステップごとの発音確率（クリックで 100→75→50→25、ホイールで微調整）">PROB</button>
+                        <button class="hw-btn hw-sm sw edit-btn" data-edit="ratchet" title="ラチェット（1ステップ内の連打回数 1〜4）">RATCH</button>
+                        <button class="hw-btn hw-sm sw edit-btn" data-edit="len" title="トラック別ステップ数（クリックしたステップまでをループ）">LEN</button>
+                    </div>
+                    <div class="switch-pair kit-switch">
+                        <button id="kitAll808" class="hw-btn hw-sm sw" title="全ボイスを 808 に">808</button>
+                        <button id="kitAll909" class="hw-btn hw-sm sw" title="全ボイスを 909 に">909</button>
+                    </div>
                     <div class="tool-group">
                         <button id="genBeatBtn" class="hw-btn hw-sm btn-gen" title="現在のSTYLEでビートを生成">GEN BEAT</button>
                         <button id="copy808" class="hw-btn hw-sm" title="パターンをコピー">COPY</button>
@@ -127,11 +166,26 @@
                 <div class="drum-grid" id="drumGrid"></div>
             </div>
             <div class="drum-mixer" id="drumMixer"></div>
-            <p class="hint">クリック: ON/OFF ・ 右クリック / SHIFT+クリック: ACCENT ・ ドラッグで連続入力</p>
+            <p class="hint">TRIG: クリック ON/OFF ・ 右クリック / SHIFT+クリック: ACCENT ・ ドラッグで連続入力 ／ 行ラベル: M=ミュート S=ソロ 808/909=キット切替 ／ PROB・RATCH・LEN は編集モードを切り替えてから</p>
+        </section>
+
+        <!-- ================= SAMPLER ================= -->
+        <section id="sectionSampler" class="unit unit-smp sequencer-section active" data-mode="instruments">
+            <div class="unit-head">
+                <div class="unit-title">
+                    <span class="unit-badge badge-smp">SP</span>
+                    <h2>SAMPLER <small>4 PADS · S1–S4 ROWS</small></h2>
+                </div>
+                <div class="unit-tools">
+                    <span class="hint hint-inline">WAV / MP3 / AIFF をパッドへドロップ、または LOAD。パターンは 808 グリッドの S1–S4 行で打ち込みます。</span>
+                </div>
+            </div>
+            <div class="sampler-slots" id="samplerSlots"></div>
+            <input type="file" id="sampleFile" accept="audio/*" hidden>
         </section>
 
         <!-- ================= TB-303 ================= -->
-        <section id="section303" class="unit unit-303 sequencer-section active">
+        <section id="section303" class="unit unit-303 sequencer-section active" data-mode="instruments">
             <div class="unit-head">
                 <div class="unit-title">
                     <span class="unit-badge">TB</span>
@@ -152,7 +206,7 @@
                 </div>
             </div>
 
-            <div class="synth-panel">
+            <div class="synth-panel" id="synthPanel303">
                 <div class="knob-group">
                     <div class="knob-wrapper">
                         <input type="range" id="cutoff" data-knob data-format="hz" min="100" max="5000" value="800">
@@ -175,15 +229,28 @@
                         <label>ACCENT</label>
                     </div>
                     <div class="knob-wrapper">
+                        <input type="range" id="drive303" data-knob data-format="pct" min="0" max="100" value="20">
+                        <label>DRIVE</label>
+                    </div>
+                    <div class="knob-wrapper">
                         <input type="range" id="level303" data-knob data-format="pct" min="0" max="100" value="80">
                         <label>LEVEL</label>
                     </div>
                 </div>
-                <div class="wave-select">
-                    <label>WAVEFORM</label>
-                    <div class="switch-pair">
-                        <button id="waveSaw" class="hw-btn hw-sm sw active" title="ノコギリ波">SAW</button>
-                        <button id="waveSqr" class="hw-btn hw-sm sw" title="矩形波">SQR</button>
+                <div class="panel-side">
+                    <div class="wave-select">
+                        <label>WAVEFORM</label>
+                        <div class="switch-pair">
+                            <button id="waveSaw" class="hw-btn hw-sm sw active" title="ノコギリ波">SAW</button>
+                            <button id="waveSqr" class="hw-btn hw-sm sw" title="矩形波">SQR</button>
+                        </div>
+                    </div>
+                    <div class="wave-select">
+                        <label>P-LOCK</label>
+                        <div class="switch-pair">
+                            <button id="plockToggle" class="hw-btn hw-sm sw" title="ON のとき、選択中ステップに CUTOFF / RESONANCE / ENV MOD / DECAY を記録（パラメータロック）">REC</button>
+                            <button id="plockClear" class="hw-btn hw-sm sw" title="選択中ステップのロックを消去">CLR</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -204,11 +271,132 @@
                 </div>
                 <div class="note-select" id="noteSelect" aria-label="Note"></div>
             </div>
-            <p class="hint">NOTE: クリックで入力 / 選択 → 鍵盤・OCTAVEで変更 ・ もう一度クリックで削除 ・ ホイールで半音移動 ・ 右クリック: ACCENT ・ SLIDE は次のステップへ滑らかにつなぐ</p>
+            <p class="hint">NOTE: クリックで入力 / 選択 → 鍵盤・OCTAVEで変更 ・ もう一度クリックで削除 ・ ホイールで半音移動 ・ 右クリック: ACCENT ・ SLIDE は次のステップへ滑らかにつなぐ ・ PROB / RATCH 行: クリックで切替、ホイールで微調整 ・ P-LOCK: ステップを選択して REC を点灯、ノブを回すとそのステップだけに記録</p>
+        </section>
+
+        <!-- ================= CHORD STAB ================= -->
+        <section id="sectionStab" class="unit unit-stab sequencer-section active" data-mode="instruments">
+            <div class="unit-head">
+                <div class="unit-title">
+                    <span class="unit-badge badge-stab">JX</span>
+                    <h2>STAB <small>CHORD MACHINE</small></h2>
+                </div>
+                <div class="unit-tools">
+                    <div class="pat-group" id="patBtnsStab" aria-label="Pattern Stab"></div>
+                    <div class="tool-group">
+                        <button id="genStabBtn" class="hw-btn hw-sm btn-gen" title="現在のKEY/SCALE/STYLEでコード進行とスタブを生成（4パターン分）">GEN STABS</button>
+                        <button id="transStabDown" class="hw-btn hw-sm" title="半音下げる">−1</button>
+                        <button id="transStabUp" class="hw-btn hw-sm" title="半音上げる">+1</button>
+                        <button id="copyStab" class="hw-btn hw-sm" title="パターンをコピー">COPY</button>
+                        <button id="pasteStab" class="hw-btn hw-sm" title="コピーしたパターンを貼り付け" disabled>PASTE</button>
+                        <button id="clearStab" class="hw-btn hw-sm btn-clear" title="パターンを消去">CLEAR</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="synth-panel" id="synthPanelStab">
+                <div class="knob-group">
+                    <div class="knob-wrapper">
+                        <input type="range" id="stabCutoff" data-knob data-format="hz" min="100" max="8000" value="1400">
+                        <label>CUTOFF</label>
+                    </div>
+                    <div class="knob-wrapper">
+                        <input type="range" id="stabRes" data-knob data-format="int" min="0" max="20" value="4">
+                        <label>RESO</label>
+                    </div>
+                    <div class="knob-wrapper">
+                        <input type="range" id="stabEnv" data-knob data-format="pct" min="0" max="100" value="55">
+                        <label>ENV</label>
+                    </div>
+                    <div class="knob-wrapper">
+                        <input type="range" id="stabDecay" data-knob data-format="sec" min="0.03" max="2" step="0.01" value="0.28">
+                        <label>DECAY</label>
+                    </div>
+                    <div class="knob-wrapper">
+                        <input type="range" id="stabRelease" data-knob data-format="sec" min="0.03" max="3" step="0.01" value="0.22">
+                        <label>RELEASE</label>
+                    </div>
+                    <div class="knob-wrapper">
+                        <input type="range" id="stabDetune" data-knob data-format="int" data-unit="c" min="0" max="50" value="12">
+                        <label>DETUNE</label>
+                    </div>
+                    <div class="knob-wrapper">
+                        <input type="range" id="stabChorus" data-knob data-format="pct" min="0" max="100" value="50">
+                        <label>CHORUS</label>
+                    </div>
+                    <div class="knob-wrapper">
+                        <input type="range" id="stabLevel" data-knob data-format="pct" min="0" max="100" value="60">
+                        <label>LEVEL</label>
+                    </div>
+                </div>
+                <div class="panel-side">
+                    <div class="wave-select">
+                        <label>WAVEFORM</label>
+                        <div class="switch-pair">
+                            <button id="stabWaveSaw" class="hw-btn hw-sm sw active" title="ノコギリ波">SAW</button>
+                            <button id="stabWaveSqr" class="hw-btn hw-sm sw" title="矩形波">SQR</button>
+                        </div>
+                    </div>
+                    <div class="wave-select">
+                        <label>OCTAVE</label>
+                        <div class="switch-pair" id="stabOctGroup">
+                            <button class="hw-btn hw-sm sw stab-oct-btn" data-oct="2">2</button>
+                            <button class="hw-btn hw-sm sw stab-oct-btn active" data-oct="3">3</button>
+                            <button class="hw-btn hw-sm sw stab-oct-btn" data-oct="4">4</button>
+                            <button class="hw-btn hw-sm sw stab-oct-btn" data-oct="5">5</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid-scroll">
+                <div class="step-indicator" id="stepIndicatorStab"></div>
+                <div class="bass-grid stab-grid" id="stabGrid"></div>
+            </div>
+            <p class="hint">CHORD: クリックで入力（303 の鍵盤で選んだ音がルート、OCTAVE はこのユニットの値）・ もう一度クリックで削除 ・ ホイールで半音移動 ・ 右クリック: ACCENT ／ TYPE: クリックでコード種を切替（m / M / m7 / M7 / 7 / sus2 / sus4 / m9 / dim / 5）</p>
+        </section>
+
+        <!-- ================= MIXER ================= -->
+        <section id="sectionMixer" class="unit unit-mixer sequencer-section" data-mode="mixer">
+            <div class="unit-head">
+                <div class="unit-title">
+                    <span class="unit-badge badge-mix">MX</span>
+                    <h2>MIXER <small>LEVEL · PAN · SENDS · MUTE / SOLO</small></h2>
+                </div>
+                <div class="unit-tools">
+                    <button id="soloClear" class="hw-btn hw-sm" title="すべてのソロを解除">CLEAR SOLO</button>
+                    <button id="muteClear" class="hw-btn hw-sm" title="すべてのミュートを解除">CLEAR MUTE</button>
+                </div>
+            </div>
+            <div class="mixer-strips" id="mixerStrips"></div>
+            <div class="mixer-master">
+                <div class="fx-panel">
+                    <h3 class="fx-title">SIDECHAIN · KICK DUCKING</h3>
+                    <div class="fx-row">
+                        <div class="fx-toggle-group">
+                            <button id="scToggle" class="fx-toggle"><span class="led"></span>OFF</button>
+                            <span class="fx-label">SIDECHAIN</span>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="scDepth" data-knob data-format="pct" min="0" max="100" value="55">
+                            <label>DEPTH</label>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="scRelease" data-knob data-format="ms" min="40" max="800" value="180">
+                            <label>RELEASE</label>
+                        </div>
+                        <span class="hint hint-inline">BD が鳴るたびに BD 以外の全チャンネルを一瞬下げます（303・STAB・サンプルも含む）。</span>
+                    </div>
+                </div>
+                <div class="fx-panel">
+                    <h3 class="fx-title">SENDS</h3>
+                    <p class="hint">DLY / REV はチャンネルごとの送り量。実際の量は CHAOS FX の DELAY / REVERB の MIX と掛け合わせです。パート別にかかり方を変えたいときに使います。</p>
+                </div>
+            </div>
         </section>
 
         <!-- ================= CHAOS FX ================= -->
-        <section id="sectionFX" class="unit unit-fx sequencer-section">
+        <section id="sectionFX" class="unit unit-fx sequencer-section" data-mode="fx">
             <div class="unit-head">
                 <div class="unit-title">
                     <span class="unit-badge badge-fx">FX</span>
@@ -232,6 +420,28 @@
                         </div>
                         <button id="tapeStopBtn" class="hw-btn hw-md btn-danger" title="テープストップ (減速して停止)">TAPE STOP</button>
                         <button id="vinylBrakeBtn" class="hw-btn hw-md btn-danger" title="ヴァイナルブレーキ (一瞬止めて復帰)">VINYL BRAKE</button>
+                    </div>
+                </div>
+
+                <div class="fx-panel">
+                    <h3 class="fx-title">OVERDRIVE</h3>
+                    <div class="fx-row">
+                        <div class="fx-toggle-group">
+                            <button id="driveToggle" class="fx-toggle"><span class="led"></span>OFF</button>
+                            <span class="fx-label">DRIVE</span>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="driveAmount" data-knob data-format="pct" min="0" max="100" value="40">
+                            <label>DRIVE</label>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="driveTone" data-knob data-format="hz" min="500" max="12000" value="4000">
+                            <label>TONE</label>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="driveMix" data-knob data-format="pct" min="0" max="100" value="100">
+                            <label>MIX</label>
+                        </div>
                     </div>
                 </div>
 
@@ -306,6 +516,37 @@
                             <label>MIX</label>
                         </div>
                         <button id="freezeBtn" class="hw-btn hw-md btn-ice" title="リバーブを凍結"><span class="led"></span>FREEZE</button>
+                    </div>
+                </div>
+
+                <div class="fx-panel fx-panel-wide">
+                    <h3 class="fx-title">TRANCE GATE / SLICER</h3>
+                    <div class="fx-row">
+                        <div class="fx-toggle-group">
+                            <button id="gateToggle" class="fx-toggle"><span class="led"></span>OFF</button>
+                            <span class="fx-label">GATE</span>
+                        </div>
+                        <div class="switch-pair">
+                            <button class="hw-btn hw-sm sw gate-rate-btn" data-rate="8">1/8</button>
+                            <button class="hw-btn hw-sm sw gate-rate-btn active" data-rate="16">1/16</button>
+                            <button class="hw-btn hw-sm sw gate-rate-btn" data-rate="32">1/32</button>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="gateDepth" data-knob data-format="pct" min="0" max="100" value="100">
+                            <label>DEPTH</label>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="gateSmooth" data-knob data-format="ms" min="1" max="60" value="8">
+                            <label>SMOOTH</label>
+                        </div>
+                        <div class="field field-inline">
+                            <label for="gatePreset">PRESET</label>
+                            <select id="gatePreset" class="hw-select hw-select-sm"></select>
+                        </div>
+                        <button id="gateRandom" class="hw-btn hw-sm btn-chaos" title="ゲートパターンをランダム生成">RANDOM</button>
+                    </div>
+                    <div class="fx-row">
+                        <div class="gate-steps" id="gateSteps"></div>
                     </div>
                 </div>
 
@@ -402,6 +643,10 @@
                                 <option value="tom_hi">HT</option>
                                 <option value="rimshot">RS</option>
                                 <option value="cowbell">CB</option>
+                                <option value="s1">S1</option>
+                                <option value="s2">S2</option>
+                                <option value="s3">S3</option>
+                                <option value="s4">S4</option>
                             </select>
                         </div>
                         <div class="knob-wrapper">
@@ -473,6 +718,101 @@
 
             </div>
         </section>
+
+        <!-- ================= SYSTEM ================= -->
+        <section id="sectionSystem" class="unit unit-sys sequencer-section" data-mode="system">
+            <div class="unit-head">
+                <div class="unit-title">
+                    <span class="unit-badge badge-sys">SY</span>
+                    <h2>SYSTEM <small>FILE · RECORD · MIDI · DISPLAY</small></h2>
+                </div>
+            </div>
+            <div class="fx-grid sys-grid">
+
+                <div class="fx-panel">
+                    <h3 class="fx-title">FILE · JSON</h3>
+                    <div class="fx-row">
+                        <button id="exportJsonBtn" class="hw-btn hw-md" title="全パターン・音色・ミキサー・FX設定を JSON ファイルに書き出し">EXPORT JSON</button>
+                        <button id="importJsonBtn" class="hw-btn hw-md" title="JSON ファイルを読み込んで状態を復元">IMPORT JSON</button>
+                        <button id="shareUrlBtn" class="hw-btn hw-md btn-ice" title="現在の状態を URL に埋め込んでクリップボードへコピー">SHARE URL</button>
+                        <input type="file" id="importFile" accept="application/json,.json" hidden>
+                    </div>
+                    <p class="hint">JSON はこのページのどこにでもドロップして読み込めます。サンプラーの音声データは JSON に含まれません（設定のみ保存、音声はこのブラウザ内に保持）。</p>
+                </div>
+
+                <div class="fx-panel">
+                    <h3 class="fx-title">RECORD · WAV</h3>
+                    <div class="fx-row">
+                        <button id="recBtn2" class="hw-btn hw-md btn-rec" title="WAV 録音 開始 / 停止"><span class="led"></span>REC</button>
+                        <div class="field field-inline">
+                            <label for="recLength">LENGTH</label>
+                            <select id="recLength" class="hw-select hw-select-sm">
+                                <option value="manual">MANUAL</option>
+                                <option value="1">1 BAR</option>
+                                <option value="4">4 BARS</option>
+                                <option value="8">8 BARS</option>
+                                <option value="chain" selected>CHAIN (4 PAT)</option>
+                                <option value="song">SONG</option>
+                            </select>
+                        </div>
+                        <span id="recStatus" class="lcd-inline">IDLE</span>
+                    </div>
+                    <p class="hint">マスター出力を 16bit ステレオ WAV で録音します。停止すると自動でダウンロード。停止中に REC を押すと先頭から再生を開始して録音します。</p>
+                </div>
+
+                <div class="fx-panel fx-panel-wide">
+                    <h3 class="fx-title">MIDI</h3>
+                    <div class="fx-row">
+                        <span id="midiStatus" class="lcd-inline">CHECKING…</span>
+                        <div class="field field-inline">
+                            <label for="midiOut">OUT</label>
+                            <select id="midiOut" class="hw-select"></select>
+                        </div>
+                        <div class="fx-toggle-group">
+                            <button id="midiClockToggle" class="fx-toggle active"><span class="led"></span>ON</button>
+                            <span class="fx-label">CLOCK OUT</span>
+                        </div>
+                        <div class="fx-toggle-group">
+                            <button id="midiNotesToggle" class="fx-toggle active"><span class="led"></span>ON</button>
+                            <span class="fx-label">NOTES OUT</span>
+                        </div>
+                        <div class="field field-inline">
+                            <label for="midiIn">IN</label>
+                            <select id="midiIn" class="hw-select"></select>
+                        </div>
+                        <button id="midiLearnBtn" class="hw-btn hw-sm btn-chaos" title="LEARN を点灯 → 画面のノブをつかむ → MIDI コントローラーのツマミを動かす"><span class="led"></span>LEARN</button>
+                        <button id="midiClearBtn" class="hw-btn hw-sm btn-clear" title="全マッピングを削除">FORGET ALL</button>
+                    </div>
+                    <div class="fx-row">
+                        <div id="midiMapList" class="midi-map-list"></div>
+                    </div>
+                    <p class="hint">OUT: クロック(24ppqn)・START/STOP、ドラム=ch10 (GM配列)、303=ch1、STAB=ch2。IN: CC はマッピングしたノブへ、ノートは 303 をライブ演奏。Safari は Web MIDI 非対応です。</p>
+                </div>
+
+                <div class="fx-panel">
+                    <h3 class="fx-title">DISPLAY</h3>
+                    <div class="fx-row">
+                        <div class="field field-inline">
+                            <label for="scopeMode">LCD</label>
+                            <select id="scopeMode" class="hw-select hw-select-sm">
+                                <option value="scope" selected>SCOPE</option>
+                                <option value="spectrum">SPECTRUM</option>
+                                <option value="off">OFF</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="fx-panel">
+                    <h3 class="fx-title">SESSION</h3>
+                    <div class="fx-row">
+                        <button id="resetAllBtn" class="hw-btn hw-md btn-danger" title="保存データを消去して初期化">RESET ALL</button>
+                        <span class="hint hint-inline">自動保存されたパターン・設定をすべて消去し、新しい曲を生成します（サンプルは残ります）。</span>
+                    </div>
+                </div>
+
+            </div>
+        </section>
     </main>
 
     <!-- ================= FOOTER ================= -->
@@ -482,27 +822,41 @@
                 <input type="range" id="masterVol" data-knob data-format="pct" min="0" max="100" value="75">
                 <label>MASTER</label>
             </div>
+            <div class="knob-wrapper">
+                <input type="range" id="masterFilter" data-knob data-bipolar data-size="l" data-format="filter" min="-100" max="100" value="0" data-default="0">
+                <label>FILTER</label>
+            </div>
+            <div class="switch-pair">
+                <button id="undoBtn" class="hw-btn hw-sm sw" title="元に戻す  [⌘Z / Ctrl+Z]" disabled>UNDO</button>
+                <button id="redoBtn" class="hw-btn hw-sm sw" title="やり直す  [⇧⌘Z / Ctrl+Y]" disabled>REDO</button>
+            </div>
         </div>
         <div class="legend">
             <span><kbd>SPACE</kbd> PLAY/STOP</span>
-            <span><kbd>1</kbd><kbd>2</kbd> MODE</span>
+            <span><kbd>F</kbd> FILL</span>
+            <span><kbd>R</kbd> REC</span>
+            <span><kbd>T</kbd> TAP</span>
+            <span><kbd>1</kbd>–<kbd>4</kbd> MODE</span>
             <span><kbd>←</kbd><kbd>→</kbd> PATTERN</span>
+            <span><kbd>⌘Z</kbd> UNDO</span>
             <span><kbd>DBL-CLICK</kbd> KNOB RESET</span>
-            <span><kbd>SHIFT</kbd>+DRAG FINE</span>
         </div>
         <div class="footer-tools">
             <span class="autosave" id="autosaveLabel">AUTOSAVE</span>
-            <button id="resetAllBtn" class="hw-btn hw-xs" title="保存データを消去して初期化">RESET</button>
         </div>
     </footer>
 </div>
 
 <script src="audio-engine.js"></script>
 <script src="generator.js"></script>
+<script src="sampler.js"></script>
 <script src="tr808.js"></script>
 <script src="tb303.js"></script>
+<script src="stab.js"></script>
 <script src="chaos-fx.js"></script>
 <script src="sequencer.js"></script>
+<script src="midi.js"></script>
+<script src="recorder.js"></script>
 <script src="knobs.js"></script>
 <script src="app.js"></script>
 </body>

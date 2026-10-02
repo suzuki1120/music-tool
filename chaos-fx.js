@@ -1,9 +1,9 @@
 /**
  * ChaosFX — master insert chain + sends + performance effects + pattern tools.
  *
- *   engine.input → bitcrush → wavefold → ringmod → phaser → autopan → post → engine.masterGain
- *                                                                      ├→ delay  (mono / ping-pong / reverse)
- *                                                                      └→ reverb (+ freeze)
+ *   engine.input → bitcrush → wavefold → drive → ringmod → phaser → trance gate → autopan → post → engine.masterGain
+ *   engine.sendDelay  (per-channel sends) → delay  (mono / ping-pong / reverse) → engine.masterGain
+ *   engine.sendReverb (per-channel sends) → reverb (+ freeze)                  → engine.masterGain
  *
  *   Each insert has a real dry/wet crossfade, so MIX behaves like a mix knob and OFF is truly bypassed.
  */
@@ -20,6 +20,8 @@ class ChaosFX {
         this.ringModEnabled = false;
         this.waveFolderEnabled = false;
         this.autoPanEnabled = false;
+        this.driveEnabled = false;
+        this.gateEnabled = false;
         this.earthquakeOn = false;
         this.glitchJumpEnabled = false;
         this.chaosLFOEnabled = false;
@@ -52,6 +54,15 @@ class ChaosFX {
         this.foldAmount = 5;
         this.foldMix = 50;
 
+        this.driveAmount = 40;     // %
+        this.driveTone = 4000;     // Hz
+        this.driveMix = 100;
+
+        this.gatePattern = [1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1];
+        this.gateRate = '16';      // '8' | '16' | '32'
+        this.gateDepth = 100;      // %
+        this.gateSmooth = 8;       // ms
+
         this.autoPanRate = 2;
         this.autoPanDepth = 80;
 
@@ -75,23 +86,45 @@ class ChaosFX {
 
         this.bitCrush = this._setupBitCrusher();
         this.fold = this._setupWaveFolder();
+        this.driveIns = this._setupDrive();
         this.ring = this._setupRingMod();
         this.phaser = this._setupPhaser();
+        this.gate = this._setupGate();
 
         this.autoPanNode = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
         this.post = ctx.createGain();
 
         this.engine.input.connect(this.bitCrush.in);
         this.bitCrush.out.connect(this.fold.in);
-        this.fold.out.connect(this.ring.in);
+        this.fold.out.connect(this.driveIns.in);
+        this.driveIns.out.connect(this.ring.in);
         this.ring.out.connect(this.phaser.in);
-        this.phaser.out.connect(this.autoPanNode);
+        this.phaser.out.connect(this.gate.in);
+        this.gate.out.connect(this.autoPanNode);
         this.autoPanNode.connect(this.post);
         this.post.connect(this.engine.masterGain);
 
         this._setupAutoPanLFO();
         this._setupDelay();
         this._setupReverb();
+
+        // re-apply any state set before the context existed
+        this.toggleBitCrush(this.bitCrushEnabled);
+        this.toggleWaveFolder(this.waveFolderEnabled);
+        this.toggleDrive(this.driveEnabled);
+        this.toggleRingMod(this.ringModEnabled);
+        this.togglePhaser(this.phaserEnabled);
+        this.toggleGate(this.gateEnabled);
+        this.toggleAutoPan(this.autoPanEnabled);
+        this.toggleReverb(this.reverbEnabled);
+        this.setPhaserRate(this.phaserRate);
+        this.setPhaserDepth(this.phaserDepth);
+        this.setRingModFreq(this.ringModFreq);
+        this.setAutoPanRate(this.autoPanRate);
+        this.setFoldAmount(this.foldAmount);
+        this.setDriveAmount(this.driveAmount);
+        this.setDriveTone(this.driveTone);
+        this._buildReverbIR(this.reverbFrozen ? 14 : this.reverbDecay);
     }
 
     // ------------------------------------------------------------ insert helper
@@ -164,7 +197,7 @@ class ChaosFX {
         const curve = new Float32Array(samples);
         for (let i = 0; i < samples; i++) {
             const x = (i * 2) / samples - 1;
-            curve[i] = Math.sin(x * amount * Math.PI * 0.5) ;
+            curve[i] = Math.sin(x * amount * Math.PI * 0.5);
         }
         this.waveFolderNode.curve = curve;
     }
@@ -178,6 +211,53 @@ class ChaosFX {
     }
     setFoldAmount(v) { this.foldAmount = v; if (this.waveFolderNode) this._updateFoldCurve(v); }
     setFoldMix(v) { this.foldMix = v; if (this.fold) { this.fold.mix = v / 100; this.fold.apply(); } }
+
+    // ------------------------------------------------------------ overdrive
+    _setupDrive() {
+        const ctx = this.engine.ctx;
+        this.drivePre = ctx.createGain();
+        this.driveShaper = ctx.createWaveShaper();
+        this.driveShaper.oversample = '4x';
+        this.driveToneNode = ctx.createBiquadFilter();
+        this.driveToneNode.type = 'lowpass';
+        this.driveToneNode.Q.value = 0.5;
+        this.drivePost = ctx.createGain();
+        this.drivePre.connect(this.driveShaper);
+        this.driveShaper.connect(this.driveToneNode);
+        this.driveToneNode.connect(this.drivePost);
+        this._updateDriveCurve();
+        return this._makeInsert(this.drivePre, this.drivePost);
+    }
+
+    _updateDriveCurve() {
+        if (!this.driveShaper) return;
+        const d = this.driveAmount / 100;
+        const k = 1 + d * 24;
+        const n = 2048;
+        const curve = new Float32Array(n);
+        const norm = Math.tanh(k);
+        for (let i = 0; i < n; i++) {
+            const x = (i * 2) / n - 1;
+            // asymmetric soft clip → a little even harmonic content
+            const y = Math.tanh(k * x + d * 0.15 * x * x) / norm;
+            curve[i] = y;
+        }
+        this.driveShaper.curve = curve;
+        const t = this.engine.ctx.currentTime;
+        this.drivePre.gain.setTargetAtTime(1 + d * 2.5, t, 0.02);
+        this.drivePost.gain.setTargetAtTime(0.85 / (1 + d * 0.9), t, 0.02);
+    }
+
+    toggleDrive(enabled) {
+        this.driveEnabled = enabled;
+        if (!this.driveIns) return;
+        this.driveIns.enabled = enabled;
+        this.driveIns.mix = this.driveMix / 100;
+        this.driveIns.apply();
+    }
+    setDriveAmount(v) { this.driveAmount = Math.max(0, Math.min(100, v)); this._updateDriveCurve(); }
+    setDriveTone(v) { this.driveTone = v; if (this.driveToneNode) this.driveToneNode.frequency.setTargetAtTime(v, this.engine.ctx.currentTime, 0.02); }
+    setDriveMix(v) { this.driveMix = v; if (this.driveIns) { this.driveIns.mix = v / 100; this.driveIns.apply(); } }
 
     // ------------------------------------------------------------ ring mod
     _setupRingMod() {
@@ -225,7 +305,6 @@ class ChaosFX {
         this.phaserStages.forEach(s => this.phaserLFOGain.connect(s.frequency));
         this.phaserLFO.start();
 
-        // feedback for a stronger notch
         const fb = ctx.createGain();
         fb.gain.value = 0.35;
         this.phaserStages[this.phaserStages.length - 1].connect(fb);
@@ -244,6 +323,69 @@ class ChaosFX {
     setPhaserRate(v) { this.phaserRate = v; if (this.phaserLFO) this.phaserLFO.frequency.setTargetAtTime(v, this.engine.ctx.currentTime, 0.02); }
     setPhaserDepth(v) { this.phaserDepth = v; if (this.phaserLFOGain) this.phaserLFOGain.gain.setTargetAtTime(v * 0.3, this.engine.ctx.currentTime, 0.02); }
     setPhaserMix(v) { this.phaserMix = v; if (this.phaser) { this.phaser.mix = v / 100; this.phaser.apply(); } }
+
+    // ------------------------------------------------------------ trance gate
+    _setupGate() {
+        const ctx = this.engine.ctx;
+        this.gateGain = ctx.createGain();
+        this.gateGain.gain.value = 1;
+        const ins = this._makeInsert(this.gateGain);
+        ins.mix = 1;
+        return ins;
+    }
+
+    toggleGate(enabled) {
+        this.gateEnabled = enabled;
+        if (!this.gate) return;
+        this.gate.enabled = enabled;
+        this.gate.mix = 1;
+        this.gate.apply();
+        if (!enabled) {
+            const t = this.engine.ctx.currentTime;
+            this.gateGain.gain.cancelScheduledValues(t);
+            this.gateGain.gain.setTargetAtTime(1, t, 0.01);
+        }
+    }
+    setGateRate(r) { this.gateRate = ['8', '16', '32'].includes(String(r)) ? String(r) : '16'; }
+    setGateDepth(v) { this.gateDepth = Math.max(0, Math.min(100, v)); }
+    setGateSmooth(ms) { this.gateSmooth = Math.max(1, Math.min(60, ms)); }
+    setGatePattern(arr) { if (Array.isArray(arr) && arr.length === 16) this.gatePattern = arr.map(v => v ? 1 : 0); }
+    toggleGateStep(i) { this.gatePattern[i] = this.gatePattern[i] ? 0 : 1; }
+    randomGatePattern() {
+        const p = [];
+        for (let i = 0; i < 16; i++) p.push(i % 4 === 0 ? 1 : (Math.random() < 0.5 ? 1 : 0));
+        this.gatePattern = p;
+        return p;
+    }
+    static get GATE_PRESETS() {
+        return {
+            'OFFBEAT': [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+            'TRANCE':  [1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1],
+            'TRIPLET': [1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+            'CHOP':    [1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0],
+            'STAB':    [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]
+        };
+    }
+
+    /** Sequencer step hook — schedule the gate shape for this 16th. */
+    onStep(tick, time, dur) {
+        if (!this.gateEnabled || !this.gateGain) return;
+        const g = this.gateGain.gain;
+        const floor = 1 - this.gateDepth / 100;
+        const tc = this.gateSmooth / 1000 / 3;
+        const set = (idx, t) => {
+            const open = this.gatePattern[((idx % 16) + 16) % 16];
+            g.setTargetAtTime(open ? 1 : floor, t, tc);
+        };
+        if (this.gateRate === '32') {
+            set(tick * 2, time);
+            set(tick * 2 + 1, time + dur / 2);
+        } else if (this.gateRate === '8') {
+            if (tick % 2 === 0) set(tick / 2, time);
+        } else {
+            set(tick, time);
+        }
+    }
 
     // ------------------------------------------------------------ auto pan
     _setupAutoPanLFO() {
@@ -273,7 +415,7 @@ class ChaosFX {
         const ctx = this.engine.ctx;
         this.delaySend = ctx.createGain();
         this.delaySend.gain.value = 0;
-        this.post.connect(this.delaySend);
+        this.engine.sendDelay.connect(this.delaySend);
 
         this.delayReturn = ctx.createGain();
         this.delayReturn.gain.value = 1;
@@ -307,10 +449,10 @@ class ChaosFX {
         p.out.gain.value = 0;
         this.delaySend.connect(p.left);
         p.left.connect(p.filterL);
-        p.filterL.connect(p.right);          // L → R
+        p.filterL.connect(p.right);
         p.right.connect(p.filterR);
         p.filterR.connect(p.fb);
-        p.fb.connect(p.left);                // R → L (feedback)
+        p.fb.connect(p.left);
         p.filterL.connect(p.merger, 0, 0);
         p.filterR.connect(p.merger, 0, 1);
         p.merger.connect(p.out);
@@ -331,7 +473,6 @@ class ChaosFX {
             const output = e.outputBuffer.getChannelData(0);
             for (let i = 0; i < input.length; i++) {
                 r.rec[r.pos] = input[i];
-                // short fade at chunk edges to avoid clicks
                 const edge = Math.min(r.pos, r.len - 1 - r.pos);
                 const fade = edge < 256 ? edge / 256 : 1;
                 output[i] = r.play[r.len - 1 - r.pos] * fade;
@@ -391,7 +532,6 @@ class ChaosFX {
         m.out.gain.setTargetAtTime(mode === 'normal' ? 1 : 0, t, 0.02);
         p.out.gain.setTargetAtTime(mode === 'pingpong' ? 1 : 0, t, 0.02);
         r.out.gain.setTargetAtTime(mode === 'reverse' ? 1 : 0, t, 0.02);
-        // Only the active path keeps feedback — inactive paths die out
         m.fb.gain.setTargetAtTime(mode === 'normal' && on ? fb : 0, t, 0.02);
         p.fb.gain.setTargetAtTime(mode === 'pingpong' && on ? fb : 0, t, 0.02);
         r.fb.gain.setTargetAtTime(mode === 'reverse' && on ? fb * 0.8 : 0, t, 0.02);
@@ -419,7 +559,7 @@ class ChaosFX {
         this.reverbHp = ctx.createBiquadFilter();
         this.reverbHp.type = 'highpass';
         this.reverbHp.frequency.value = 180;
-        this.post.connect(this.reverbSend);
+        this.engine.sendReverb.connect(this.reverbSend);
         this.reverbSend.connect(this.reverbHp);
         this.reverbHp.connect(this.reverbNode);
         this.reverbNode.connect(this.engine.masterGain);
@@ -530,9 +670,6 @@ class ChaosFX {
     toggleGlitchJump(enabled) { this.glitchJumpEnabled = enabled; }
 
     // ------------------------------------------------------------ tape stop / vinyl brake
-    /**
-     * Slow the clock, drop the pitch, fade — then stop (tape) or snap back (brake).
-     */
     _tapeEffect(sequencer, tb303, duration, stopAtEnd, done) {
         if (!this.engine.ctx || !sequencer || !sequencer.isPlaying || this._tape) return false;
         const ctx = this.engine.ctx;
@@ -566,9 +703,7 @@ class ChaosFX {
         sequencer.tempoScale = 1;
         this.engine.pitchFactor = 1;
         if (tb303) tb303.bendTo(1);
-        if (stopAtEnd) {
-            sequencer.stop();
-        }
+        if (stopAtEnd) sequencer.stop();
         pg.cancelScheduledValues(ctx.currentTime);
         pg.setValueAtTime(0.02, ctx.currentTime);
         pg.linearRampToValueAtTime(1, ctx.currentTime + 0.08);
@@ -583,7 +718,6 @@ class ChaosFX {
         return this._tapeEffect(sequencer, tb303, 0.65, false, done);
     }
 
-    /** Called on STOP / PLAY to abort any running tape effect. */
     cancelTape(sequencer, tb303) {
         if (this._tape) this._finishTape(sequencer, tb303, false, null);
     }
@@ -600,7 +734,6 @@ class ChaosFX {
             if (bucket >= steps) { bucket -= steps; pattern.push(true); }
             else pattern.push(false);
         }
-        // start on a hit
         const first = pattern.indexOf(true);
         let out = first > 0 ? [...pattern.slice(first), ...pattern.slice(0, first)] : pattern;
         if (rotation) {
@@ -615,7 +748,6 @@ class ChaosFX {
         const mutated = {};
         Object.keys(pattern).forEach(key => {
             mutated[key] = pattern[key].map((v, i) => {
-                // protect the downbeat kick so the groove keeps its anchor
                 if (key === 'kick' && i === 0) return v || 1;
                 if (Math.random() * 100 < amount * 0.6) return v ? 0 : 1;
                 return v;
@@ -696,7 +828,6 @@ class ChaosFX {
         return this.drunkMode;
     }
 
-    /** Tasteful random 303 settings (uses style ranges instead of the full extreme range). */
     robotAcid(tb303, style = 'acid') {
         const p = MusicGen.synthParams(style);
         tb303.setCutoff(p.cutoff);
