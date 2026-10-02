@@ -3,414 +3,507 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SYNTH SEQUENCER - TR-808 / TB-303</title>
+    <title>SYNTH SEQUENCER — TR-808 / TB-303 Groovebox</title>
+    <meta name="description" content="Browser groovebox: TR-808 drum machine + TB-303 bass line with chaos FX and a musical pattern composer.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="app">
-        <header class="header">
-            <h1 class="logo">SYNTH <span>SEQUENCER</span></h1>
-            <div class="transport">
-                <button id="playBtn" class="btn btn-play">▶ PLAY</button>
-                <button id="stopBtn" class="btn btn-stop">■ STOP</button>
-                <div class="bpm-control">
-                    <label>BPM</label>
-                    <input type="range" id="bpmSlider" min="20" max="300" value="128">
-                    <span id="bpmValue">128</span>
+<div id="app" class="rack">
+
+    <!-- ================= TRANSPORT UNIT ================= -->
+    <header class="unit unit-transport">
+        <div class="brand">
+            <div class="brand-name">SYNTH<span>SEQUENCER</span></div>
+            <div class="brand-model">MK-II · RHYTHM COMPOSER + BASS LINE</div>
+            <div class="brand-leds">
+                <span class="led led-power is-on" title="POWER"></span>
+                <span id="ledRun" class="led led-run" title="RUN"></span>
+                <span id="ledBeat" class="led led-beat" title="BEAT"></span>
+            </div>
+        </div>
+
+        <div class="lcd" aria-live="polite">
+            <div class="lcd-main">
+                <div class="lcd-bpm">
+                    <span class="lcd-label">TEMPO</span>
+                    <span id="lcdBpm" class="lcd-big">128.0</span>
+                    <span class="lcd-unit">BPM</span>
                 </div>
-                <div class="swing-control">
-                    <label>SWING</label>
-                    <input type="range" id="swingSlider" min="0" max="100" value="0">
-                    <span id="swingValue">0%</span>
+                <div class="lcd-cells">
+                    <div class="lcd-cell"><span class="lcd-label">PATTERN</span><span id="lcdPattern" class="lcd-val">A1</span></div>
+                    <div class="lcd-cell"><span class="lcd-label">BAR</span><span id="lcdBar" class="lcd-val">–</span></div>
+                    <div class="lcd-cell"><span class="lcd-label">SWING</span><span id="lcdSwing" class="lcd-val">0%</span></div>
+                    <div class="lcd-cell"><span class="lcd-label">KEY</span><span id="lcdKey" class="lcd-val">A MIN.P</span></div>
+                    <div class="lcd-cell"><span class="lcd-label">CHAIN</span><span id="lcdChain" class="lcd-val">OFF</span></div>
                 </div>
             </div>
-        </header>
+            <div class="lcd-steps" id="lcdSteps"></div>
+            <div class="lcd-msg"><span id="statusText">READY — PRESS PLAY OR COMPOSE</span></div>
+        </div>
 
-        <nav class="mode-switch">
-            <button id="modeInst" class="mode-btn active" data-mode="instruments">🎵 INSTRUMENTS</button>
-            <button id="modeFX" class="mode-btn" data-mode="fx">☢ CHAOS FX</button>
-        </nav>
+        <div class="transport">
+            <div class="transport-row">
+                <button id="playBtn" class="hw-btn hw-lg btn-play" title="PLAY / STOP  [SPACE]"><span class="led"></span>PLAY</button>
+                <button id="stopBtn" class="hw-btn hw-lg btn-stop" title="STOP"><span class="led"></span>STOP</button>
+            </div>
+            <div class="transport-row knobs-row">
+                <div class="knob-wrapper">
+                    <input type="range" id="bpmSlider" data-knob data-format="int" min="20" max="300" value="128">
+                    <label>TEMPO</label>
+                </div>
+                <div class="stepper">
+                    <button id="bpmDown" class="hw-btn hw-xs" title="BPM −1">−</button>
+                    <button id="bpmUp" class="hw-btn hw-xs" title="BPM +1">+</button>
+                </div>
+                <div class="knob-wrapper">
+                    <input type="range" id="swingSlider" data-knob data-format="pct" min="0" max="100" value="0">
+                    <label>SWING</label>
+                </div>
+            </div>
+        </div>
 
-        <main class="sequencer-container">
-            <!-- TR-808 Section -->
-            <section id="section808" class="sequencer-section active">
-                <div class="section-header">
-                    <h2>TR-808 DRUM MACHINE</h2>
-                    <div class="pattern-controls">
-                        <label>PATTERN</label>
-                        <select id="pattern808">
-                            <option value="0">A1</option>
-                            <option value="1">A2</option>
-                            <option value="2">B1</option>
-                            <option value="3">B2</option>
-                        </select>
-                        <button id="clear808" class="btn btn-small">CLEAR</button>
+        <div class="composer">
+            <div class="composer-title">COMPOSER</div>
+            <div class="composer-row">
+                <div class="field">
+                    <label for="styleSelect">STYLE</label>
+                    <select id="styleSelect" class="hw-select"></select>
+                </div>
+                <div class="field">
+                    <label for="keySelect">KEY</label>
+                    <select id="keySelect" class="hw-select"></select>
+                </div>
+                <div class="field">
+                    <label for="scaleSelect">SCALE</label>
+                    <select id="scaleSelect" class="hw-select"></select>
+                </div>
+            </div>
+            <div class="composer-row">
+                <button id="composeBtn" class="hw-btn hw-md btn-compose" title="4パターン分の曲を一括生成してチェイン再生"><span class="led"></span>COMPOSE TRACK</button>
+                <button id="chainToggle" class="hw-btn hw-md" title="A1→A2→B1→B2 をチェイン再生"><span class="led"></span>CHAIN</button>
+                <div class="field field-inline">
+                    <label for="chainBars">BARS</label>
+                    <select id="chainBars" class="hw-select hw-select-sm">
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="4" selected>4</option>
+                        <option value="8">8</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ================= MODE SWITCH ================= -->
+    <nav class="mode-switch" role="tablist">
+        <button id="modeInst" class="mode-btn active" data-mode="instruments" role="tab" aria-selected="true"><span class="led"></span>INSTRUMENTS <kbd>1</kbd></button>
+        <button id="modeFX" class="mode-btn" data-mode="fx" role="tab" aria-selected="false"><span class="led"></span>CHAOS FX <kbd>2</kbd></button>
+    </nav>
+
+    <main class="sequencer-container">
+
+        <!-- ================= TR-808 ================= -->
+        <section id="section808" class="unit unit-808 sequencer-section active">
+            <div class="unit-head">
+                <div class="unit-title">
+                    <span class="unit-badge">TR</span>
+                    <h2>808 <small>RHYTHM COMPOSER</small></h2>
+                </div>
+                <div class="unit-tools">
+                    <div class="pat-group" id="patBtns808" aria-label="Pattern 808"></div>
+                    <div class="tool-group">
+                        <button id="genBeatBtn" class="hw-btn hw-sm btn-gen" title="現在のSTYLEでビートを生成">GEN BEAT</button>
+                        <button id="copy808" class="hw-btn hw-sm" title="パターンをコピー">COPY</button>
+                        <button id="paste808" class="hw-btn hw-sm" title="コピーしたパターンを貼り付け" disabled>PASTE</button>
+                        <button id="clear808" class="hw-btn hw-sm btn-clear" title="パターンを消去">CLEAR</button>
                     </div>
                 </div>
+            </div>
+            <div class="grid-scroll">
                 <div class="step-indicator" id="stepIndicator808"></div>
                 <div class="drum-grid" id="drumGrid"></div>
-                <div class="drum-mixer" id="drumMixer"></div>
-            </section>
+            </div>
+            <div class="drum-mixer" id="drumMixer"></div>
+            <p class="hint">クリック: ON/OFF ・ 右クリック / SHIFT+クリック: ACCENT ・ ドラッグで連続入力</p>
+        </section>
 
-            <!-- TB-303 Section -->
-            <section id="section303" class="sequencer-section active">
-                <div class="section-header">
-                    <h2>TB-303 BASS LINE</h2>
-                    <div class="pattern-controls">
-                        <label>PATTERN</label>
-                        <select id="pattern303">
-                            <option value="0">A1</option>
-                            <option value="1">A2</option>
-                            <option value="2">B1</option>
-                            <option value="3">B2</option>
-                        </select>
-                        <button id="clear303" class="btn btn-small">CLEAR</button>
+        <!-- ================= TB-303 ================= -->
+        <section id="section303" class="unit unit-303 sequencer-section active">
+            <div class="unit-head">
+                <div class="unit-title">
+                    <span class="unit-badge">TB</span>
+                    <h2>303 <small>BASS LINE</small></h2>
+                </div>
+                <div class="unit-tools">
+                    <div class="pat-group" id="patBtns303" aria-label="Pattern 303"></div>
+                    <div class="tool-group">
+                        <button id="genLineBtn" class="hw-btn hw-sm btn-gen" title="現在のKEY/SCALEでベースラインを生成">GEN LINE</button>
+                        <button id="transDown" class="hw-btn hw-sm" title="半音下げる">−1</button>
+                        <button id="transUp" class="hw-btn hw-sm" title="半音上げる">+1</button>
+                        <button id="octDown" class="hw-btn hw-sm" title="1オクターブ下げる">−OCT</button>
+                        <button id="octUp" class="hw-btn hw-sm" title="1オクターブ上げる">+OCT</button>
+                        <button id="copy303" class="hw-btn hw-sm" title="パターンをコピー">COPY</button>
+                        <button id="paste303" class="hw-btn hw-sm" title="コピーしたパターンを貼り付け" disabled>PASTE</button>
+                        <button id="clear303" class="hw-btn hw-sm btn-clear" title="パターンを消去">CLEAR</button>
                     </div>
                 </div>
-                <div class="synth-controls">
-                    <div class="knob-group">
+            </div>
+
+            <div class="synth-panel">
+                <div class="knob-group">
+                    <div class="knob-wrapper">
+                        <input type="range" id="cutoff" data-knob data-format="hz" min="100" max="5000" value="800">
+                        <label>CUTOFF</label>
+                    </div>
+                    <div class="knob-wrapper">
+                        <input type="range" id="resonance" data-knob data-format="int" min="0" max="30" value="15">
+                        <label>RESONANCE</label>
+                    </div>
+                    <div class="knob-wrapper">
+                        <input type="range" id="envMod" data-knob data-format="pct" min="0" max="100" value="50">
+                        <label>ENV MOD</label>
+                    </div>
+                    <div class="knob-wrapper">
+                        <input type="range" id="decay" data-knob data-format="sec" min="0.05" max="2" value="0.3" step="0.01">
+                        <label>DECAY</label>
+                    </div>
+                    <div class="knob-wrapper">
+                        <input type="range" id="accent" data-knob data-format="pct" min="0" max="100" value="50">
+                        <label>ACCENT</label>
+                    </div>
+                    <div class="knob-wrapper">
+                        <input type="range" id="level303" data-knob data-format="pct" min="0" max="100" value="80">
+                        <label>LEVEL</label>
+                    </div>
+                </div>
+                <div class="wave-select">
+                    <label>WAVEFORM</label>
+                    <div class="switch-pair">
+                        <button id="waveSaw" class="hw-btn hw-sm sw active" title="ノコギリ波">SAW</button>
+                        <button id="waveSqr" class="hw-btn hw-sm sw" title="矩形波">SQR</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid-scroll">
+                <div class="step-indicator" id="stepIndicator303"></div>
+                <div class="bass-grid" id="bassGrid"></div>
+            </div>
+
+            <div class="note-controls">
+                <div class="octave-select">
+                    <label>OCTAVE</label>
+                    <div class="switch-pair">
+                        <button class="hw-btn hw-sm sw oct-btn" data-oct="1">1</button>
+                        <button class="hw-btn hw-sm sw oct-btn active" data-oct="2">2</button>
+                        <button class="hw-btn hw-sm sw oct-btn" data-oct="3">3</button>
+                    </div>
+                </div>
+                <div class="note-select" id="noteSelect" aria-label="Note"></div>
+            </div>
+            <p class="hint">NOTE: クリックで入力 / 選択 → 鍵盤・OCTAVEで変更 ・ もう一度クリックで削除 ・ ホイールで半音移動 ・ 右クリック: ACCENT ・ SLIDE は次のステップへ滑らかにつなぐ</p>
+        </section>
+
+        <!-- ================= CHAOS FX ================= -->
+        <section id="sectionFX" class="unit unit-fx sequencer-section">
+            <div class="unit-head">
+                <div class="unit-title">
+                    <span class="unit-badge badge-fx">FX</span>
+                    <h2>CHAOS <small>LABORATORY</small></h2>
+                </div>
+            </div>
+
+            <div class="fx-grid">
+
+                <div class="fx-panel">
+                    <h3 class="fx-title">GLITCH / STUTTER</h3>
+                    <div class="fx-row">
+                        <button id="stutterBtn" class="hw-btn hw-md momentary" title="押している間ステップをリピート">STUTTER<small>HOLD</small></button>
                         <div class="knob-wrapper">
-                            <input type="range" id="cutoff" class="knob" min="100" max="5000" value="800">
-                            <label>CUTOFF</label>
+                            <input type="range" id="stutterRate" data-knob data-format="int" data-unit="/beat" min="1" max="32" value="8">
+                            <label>RATE</label>
                         </div>
                         <div class="knob-wrapper">
-                            <input type="range" id="resonance" class="knob" min="0" max="30" value="15">
-                            <label>RESONANCE</label>
+                            <input type="range" id="stutterDecay" data-knob data-format="pct" min="0" max="100" value="30">
+                            <label>DECAY</label>
+                        </div>
+                        <button id="tapeStopBtn" class="hw-btn hw-md btn-danger" title="テープストップ (減速して停止)">TAPE STOP</button>
+                        <button id="vinylBrakeBtn" class="hw-btn hw-md btn-danger" title="ヴァイナルブレーキ (一瞬止めて復帰)">VINYL BRAKE</button>
+                    </div>
+                </div>
+
+                <div class="fx-panel">
+                    <h3 class="fx-title">BIT CRUSHER / LO-FI</h3>
+                    <div class="fx-row">
+                        <div class="fx-toggle-group">
+                            <button id="bitCrushToggle" class="fx-toggle"><span class="led"></span>OFF</button>
+                            <span class="fx-label">BIT CRUSH</span>
                         </div>
                         <div class="knob-wrapper">
-                            <input type="range" id="envMod" class="knob" min="0" max="100" value="50">
-                            <label>ENV MOD</label>
+                            <input type="range" id="bitDepth" data-knob data-format="int" data-unit="bit" min="1" max="16" value="8">
+                            <label>BITS</label>
                         </div>
                         <div class="knob-wrapper">
-                            <input type="range" id="decay" class="knob" min="0.05" max="2" value="0.3" step="0.05">
+                            <input type="range" id="sampleRateReduce" data-knob data-format="x" min="1" max="50" value="1">
+                            <label>DOWNSAMPLE</label>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="crushMix" data-knob data-format="pct" min="0" max="100" value="50">
+                            <label>MIX</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="fx-panel">
+                    <h3 class="fx-title">DELAY / ECHO</h3>
+                    <div class="fx-row">
+                        <div class="fx-toggle-group">
+                            <button id="delayToggle" class="fx-toggle"><span class="led"></span>OFF</button>
+                            <span class="fx-label">DELAY</span>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="delayTime" data-knob data-format="int" data-unit="/16" min="1" max="16" value="4">
+                            <label>TIME</label>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="delayFeedback" data-knob data-format="pct" min="0" max="92" value="50">
+                            <label>FEEDBACK</label>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="delayFilter" data-knob data-format="hz" min="200" max="8000" value="3000">
+                            <label>FILTER</label>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="delayMix" data-knob data-format="pct" min="0" max="100" value="30">
+                            <label>MIX</label>
+                        </div>
+                    </div>
+                    <div class="fx-row">
+                        <div class="switch-pair">
+                            <button class="hw-btn hw-sm sw delay-mode-btn active" data-mode="normal">MONO</button>
+                            <button class="hw-btn hw-sm sw delay-mode-btn" data-mode="pingpong">PING PONG</button>
+                            <button class="hw-btn hw-sm sw delay-mode-btn" data-mode="reverse">REVERSE</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="fx-panel">
+                    <h3 class="fx-title">REVERB / FREEZE</h3>
+                    <div class="fx-row">
+                        <div class="fx-toggle-group">
+                            <button id="reverbToggle" class="fx-toggle"><span class="led"></span>OFF</button>
+                            <span class="fx-label">REVERB</span>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="reverbDecay" data-knob data-format="sec" min="0.5" max="10" step="0.1" value="2.5">
                             <label>DECAY</label>
                         </div>
                         <div class="knob-wrapper">
-                            <input type="range" id="accent" class="knob" min="0" max="100" value="50">
-                            <label>ACCENT</label>
+                            <input type="range" id="reverbMix" data-knob data-format="pct" min="0" max="100" value="40">
+                            <label>MIX</label>
                         </div>
-                    </div>
-                    <div class="wave-select">
-                        <label>WAVE</label>
-                        <button id="waveSaw" class="wave-btn active">SAW</button>
-                        <button id="waveSqr" class="wave-btn">SQR</button>
-                    </div>
-                </div>
-                <div class="step-indicator" id="stepIndicator303"></div>
-                <div class="bass-grid" id="bassGrid"></div>
-                <div class="note-controls">
-                    <div class="octave-select">
-                        <label>OCTAVE</label>
-                        <button class="oct-btn" data-oct="1">1</button>
-                        <button class="oct-btn active" data-oct="2">2</button>
-                        <button class="oct-btn" data-oct="3">3</button>
-                    </div>
-                    <div class="note-select" id="noteSelect"></div>
-                </div>
-            </section>
-            <!-- CHAOS FX Section -->
-            <section id="sectionFX" class="sequencer-section">
-                <div class="section-header">
-                    <h2>☢ CHAOS LABORATORY ☢</h2>
-                </div>
-
-                <!-- Glitch / Stutter -->
-                <div class="fx-panel">
-                    <h3 class="fx-title">🔥 GLITCH / STUTTER</h3>
-                    <div class="fx-row">
-                        <button id="stutterBtn" class="fx-btn pulse-btn">STUTTER</button>
-                        <div class="fx-knob-row">
-                            <div class="knob-wrapper">
-                                <input type="range" id="stutterRate" min="1" max="32" value="8">
-                                <label>RATE</label>
-                            </div>
-                            <div class="knob-wrapper">
-                                <input type="range" id="stutterDecay" min="0" max="100" value="30">
-                                <label>DECAY</label>
-                            </div>
-                        </div>
-                        <button id="tapeStopBtn" class="fx-btn danger-btn">TAPE STOP</button>
-                        <button id="vinylBrakeBtn" class="fx-btn danger-btn">VINYL BRAKE</button>
+                        <button id="freezeBtn" class="hw-btn hw-md btn-ice" title="リバーブを凍結"><span class="led"></span>FREEZE</button>
                     </div>
                 </div>
 
-                <!-- Bit Crusher / Lo-Fi -->
                 <div class="fx-panel">
-                    <h3 class="fx-title">👾 BIT CRUSHER / LO-FI</h3>
+                    <h3 class="fx-title">PHASER</h3>
                     <div class="fx-row">
                         <div class="fx-toggle-group">
-                            <button id="bitCrushToggle" class="fx-toggle">OFF</button>
-                            <span class="fx-label">BIT CRUSH</span>
-                        </div>
-                        <div class="fx-knob-row">
-                            <div class="knob-wrapper">
-                                <input type="range" id="bitDepth" min="1" max="16" value="8">
-                                <label>BITS</label>
-                            </div>
-                            <div class="knob-wrapper">
-                                <input type="range" id="sampleRateReduce" min="1" max="50" value="1">
-                                <label>DOWNSAMPLE</label>
-                            </div>
-                            <div class="knob-wrapper">
-                                <input type="range" id="crushMix" min="0" max="100" value="50">
-                                <label>MIX</label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Delay -->
-                <div class="fx-panel">
-                    <h3 class="fx-title">🌀 DELAY / ECHO</h3>
-                    <div class="fx-row">
-                        <div class="fx-toggle-group">
-                            <button id="delayToggle" class="fx-toggle">OFF</button>
-                            <span class="fx-label">DELAY</span>
-                        </div>
-                        <div class="fx-knob-row">
-                            <div class="knob-wrapper">
-                                <input type="range" id="delayTime" min="1" max="16" value="4">
-                                <label>TIME (1/16)</label>
-                            </div>
-                            <div class="knob-wrapper">
-                                <input type="range" id="delayFeedback" min="0" max="95" value="50">
-                                <label>FEEDBACK</label>
-                            </div>
-                            <div class="knob-wrapper">
-                                <input type="range" id="delayFilter" min="200" max="8000" value="3000">
-                                <label>FILTER</label>
-                            </div>
-                            <div class="knob-wrapper">
-                                <input type="range" id="delayMix" min="0" max="100" value="30">
-                                <label>MIX</label>
-                            </div>
-                        </div>
-                        <div class="delay-mode-select">
-                            <button class="delay-mode-btn active" data-mode="normal">MONO</button>
-                            <button class="delay-mode-btn" data-mode="pingpong">PING PONG</button>
-                            <button class="delay-mode-btn" data-mode="reverse">REVERSE</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Pattern Chaos -->
-                <div class="fx-panel">
-                    <h3 class="fx-title">🎲 PATTERN CHAOS</h3>
-                    <div class="fx-row">
-                        <div class="chaos-btns">
-                            <button id="euclideanBtn" class="fx-btn chaos-btn">EUCLIDEAN</button>
-                            <button id="mutateBtn" class="fx-btn chaos-btn">MUTATE</button>
-                            <button id="reverseBtn" class="fx-btn chaos-btn">REVERSE</button>
-                            <button id="randomAcidBtn" class="fx-btn chaos-btn">ACID RANDOM</button>
-                            <button id="palindromeBtn" class="fx-btn chaos-btn">PALINDROME</button>
-                            <button id="shiftLBtn" class="fx-btn chaos-btn">← SHIFT</button>
-                            <button id="shiftRBtn" class="fx-btn chaos-btn">SHIFT →</button>
-                        </div>
-                    </div>
-                    <div class="fx-row">
-                        <div class="fx-knob-row">
-                            <div class="knob-wrapper">
-                                <input type="range" id="euclideanHits" min="1" max="16" value="5">
-                                <label>HITS</label>
-                            </div>
-                            <div class="knob-wrapper">
-                                <input type="range" id="euclideanRotate" min="0" max="15" value="0">
-                                <label>ROTATE</label>
-                            </div>
-                            <div class="knob-wrapper">
-                                <input type="range" id="mutateAmount" min="1" max="100" value="30">
-                                <label>CHAOS %</label>
-                            </div>
-                            <div class="knob-wrapper">
-                                <input type="range" id="probability" min="0" max="100" value="100">
-                                <label>PROB</label>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Reverb / Freeze -->
-                <div class="fx-panel">
-                    <h3 class="fx-title">🌌 REVERB / FREEZE</h3>
-                    <div class="fx-row">
-                        <div class="fx-toggle-group">
-                            <button id="reverbToggle" class="fx-toggle">OFF</button>
-                            <span class="fx-label">REVERB</span>
-                        </div>
-                        <div class="fx-knob-row">
-                            <div class="knob-wrapper">
-                                <input type="range" id="reverbDecay" min="0.5" max="10" step="0.1" value="2.5">
-                                <label>DECAY</label>
-                            </div>
-                            <div class="knob-wrapper">
-                                <input type="range" id="reverbMix" min="0" max="100" value="40">
-                                <label>MIX</label>
-                            </div>
-                        </div>
-                        <button id="freezeBtn" class="fx-btn danger-btn">❄ FREEZE</button>
-                    </div>
-                </div>
-
-                <!-- Phaser -->
-                <div class="fx-panel">
-                    <h3 class="fx-title">🌊 PHASER</h3>
-                    <div class="fx-row">
-                        <div class="fx-toggle-group">
-                            <button id="phaserToggle" class="fx-toggle">OFF</button>
+                            <button id="phaserToggle" class="fx-toggle"><span class="led"></span>OFF</button>
                             <span class="fx-label">PHASER</span>
                         </div>
-                        <div class="fx-knob-row">
-                            <div class="knob-wrapper">
-                                <input type="range" id="phaserRate" min="0.1" max="10" step="0.1" value="0.5">
-                                <label>RATE</label>
-                            </div>
-                            <div class="knob-wrapper">
-                                <input type="range" id="phaserDepth" min="100" max="3000" value="800">
-                                <label>DEPTH</label>
-                            </div>
-                            <div class="knob-wrapper">
-                                <input type="range" id="phaserMix" min="0" max="100" value="50">
-                                <label>MIX</label>
-                            </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="phaserRate" data-knob data-format="float1" data-unit="Hz" min="0.1" max="10" step="0.1" value="0.5">
+                            <label>RATE</label>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="phaserDepth" data-knob data-format="int" min="100" max="3000" value="800">
+                            <label>DEPTH</label>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="phaserMix" data-knob data-format="pct" min="0" max="100" value="50">
+                            <label>MIX</label>
                         </div>
                     </div>
                 </div>
 
-                <!-- Ring Modulator -->
                 <div class="fx-panel">
-                    <h3 class="fx-title">🛸 RING MODULATOR</h3>
+                    <h3 class="fx-title">RING MODULATOR</h3>
                     <div class="fx-row">
                         <div class="fx-toggle-group">
-                            <button id="ringModToggle" class="fx-toggle">OFF</button>
+                            <button id="ringModToggle" class="fx-toggle"><span class="led"></span>OFF</button>
                             <span class="fx-label">RING MOD</span>
                         </div>
-                        <div class="fx-knob-row">
-                            <div class="knob-wrapper">
-                                <input type="range" id="ringModFreq" min="20" max="3000" value="200">
-                                <label>FREQ</label>
-                            </div>
-                            <div class="knob-wrapper">
-                                <input type="range" id="ringModMix" min="0" max="100" value="50">
-                                <label>MIX</label>
-                            </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="ringModFreq" data-knob data-format="hz" min="20" max="3000" value="200">
+                            <label>FREQ</label>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="ringModMix" data-knob data-format="pct" min="0" max="100" value="50">
+                            <label>MIX</label>
                         </div>
                     </div>
                 </div>
 
-                <!-- Wave Folder -->
                 <div class="fx-panel">
-                    <h3 class="fx-title">🌀 WAVE FOLDER</h3>
+                    <h3 class="fx-title">WAVE FOLDER</h3>
                     <div class="fx-row">
                         <div class="fx-toggle-group">
-                            <button id="waveFolderToggle" class="fx-toggle">OFF</button>
+                            <button id="waveFolderToggle" class="fx-toggle"><span class="led"></span>OFF</button>
                             <span class="fx-label">FOLDER</span>
                         </div>
-                        <div class="fx-knob-row">
-                            <div class="knob-wrapper">
-                                <input type="range" id="foldAmount" min="1" max="20" step="0.5" value="5">
-                                <label>FOLD</label>
-                            </div>
-                            <div class="knob-wrapper">
-                                <input type="range" id="foldMix" min="0" max="100" value="50">
-                                <label>MIX</label>
-                            </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="foldAmount" data-knob data-format="float1" min="1" max="20" step="0.5" value="5">
+                            <label>FOLD</label>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="foldMix" data-knob data-format="pct" min="0" max="100" value="50">
+                            <label>MIX</label>
                         </div>
                     </div>
                 </div>
 
-                <!-- Auto Pan -->
                 <div class="fx-panel">
-                    <h3 class="fx-title">🔄 AUTO PANNER</h3>
+                    <h3 class="fx-title">AUTO PANNER</h3>
                     <div class="fx-row">
                         <div class="fx-toggle-group">
-                            <button id="autoPanToggle" class="fx-toggle">OFF</button>
+                            <button id="autoPanToggle" class="fx-toggle"><span class="led"></span>OFF</button>
                             <span class="fx-label">AUTO PAN</span>
                         </div>
-                        <div class="fx-knob-row">
-                            <div class="knob-wrapper">
-                                <input type="range" id="autoPanRate" min="0.1" max="20" step="0.1" value="2">
-                                <label>RATE</label>
-                            </div>
-                            <div class="knob-wrapper">
-                                <input type="range" id="autoPanDepth" min="0" max="100" value="80">
-                                <label>DEPTH</label>
-                            </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="autoPanRate" data-knob data-format="float1" data-unit="Hz" min="0.1" max="20" step="0.1" value="2">
+                            <label>RATE</label>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="autoPanDepth" data-knob data-format="pct" min="0" max="100" value="80">
+                            <label>DEPTH</label>
                         </div>
                     </div>
                 </div>
 
-                <!-- Mad Modulators -->
-                <div class="fx-panel">
-                    <h3 class="fx-title">😈 MAD MODULATORS</h3>
+                <div class="fx-panel fx-panel-wide">
+                    <h3 class="fx-title">PATTERN CHAOS</h3>
+                    <div class="fx-row">
+                        <div class="field field-inline">
+                            <label for="euclidTarget">TARGET</label>
+                            <select id="euclidTarget" class="hw-select hw-select-sm">
+                                <option value="random">RANDOM</option>
+                                <option value="303">TB-303</option>
+                                <option value="kick">BD</option>
+                                <option value="snare">SD</option>
+                                <option value="clap">CP</option>
+                                <option value="hihat_c">CH</option>
+                                <option value="hihat_o">OH</option>
+                                <option value="tom_lo">LT</option>
+                                <option value="tom_hi">HT</option>
+                                <option value="rimshot">RS</option>
+                                <option value="cowbell">CB</option>
+                            </select>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="euclideanHits" data-knob data-format="int" min="1" max="16" value="5">
+                            <label>HITS</label>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="euclideanRotate" data-knob data-format="int" min="0" max="15" value="0">
+                            <label>ROTATE</label>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="mutateAmount" data-knob data-format="pct" min="1" max="100" value="30">
+                            <label>CHAOS</label>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="probability" data-knob data-format="pct" min="0" max="100" value="100">
+                            <label>PROB</label>
+                        </div>
+                    </div>
+                    <div class="fx-row chaos-btns">
+                        <button id="euclideanBtn" class="hw-btn hw-sm btn-chaos" title="ユークリッドリズムを生成">EUCLID</button>
+                        <button id="mutateBtn" class="hw-btn hw-sm btn-chaos" title="現在のパターンを少し変異">MUTATE</button>
+                        <button id="reverseBtn" class="hw-btn hw-sm btn-chaos" title="パターンを反転">REVERSE</button>
+                        <button id="palindromeBtn" class="hw-btn hw-sm btn-chaos" title="前半を鏡像化">PALINDROME</button>
+                        <button id="shiftLBtn" class="hw-btn hw-sm btn-chaos" title="1ステップ左へ">◀ SHIFT</button>
+                        <button id="shiftRBtn" class="hw-btn hw-sm btn-chaos" title="1ステップ右へ">SHIFT ▶</button>
+                        <button id="randomAcidBtn" class="hw-btn hw-sm btn-chaos" title="KEY/SCALEに沿ったアシッドラインを生成">ACID LINE</button>
+                    </div>
+                </div>
+
+                <div class="fx-panel fx-panel-wide">
+                    <h3 class="fx-title">MAD MODULATORS · TIME WARP</h3>
                     <div class="fx-row">
                         <div class="fx-toggle-group">
-                            <button id="chaosLFOToggle" class="fx-toggle">OFF</button>
+                            <button id="chaosLFOToggle" class="fx-toggle"><span class="led"></span>OFF</button>
                             <span class="fx-label">CHAOS LFO</span>
                         </div>
                         <div class="fx-toggle-group">
-                            <button id="glitchJumpToggle" class="fx-toggle">OFF</button>
+                            <button id="glitchJumpToggle" class="fx-toggle"><span class="led"></span>OFF</button>
                             <span class="fx-label">GLITCH JUMP</span>
                         </div>
                         <div class="fx-toggle-group">
-                            <button id="earthquakeToggle" class="fx-toggle">OFF</button>
+                            <button id="earthquakeToggle" class="fx-toggle"><span class="led"></span>OFF</button>
                             <span class="fx-label">EARTHQUAKE</span>
                         </div>
-                        <button id="screamBtn" class="fx-btn nuke-btn">🔊 SCREAM</button>
-                    </div>
-                </div>
-
-                <!-- Polyrhythm -->
-                <div class="fx-panel">
-                    <h3 class="fx-title">🔀 POLYRHYTHM / TIME WARP</h3>
-                    <div class="fx-row">
                         <div class="fx-toggle-group">
-                            <button id="polyToggle" class="fx-toggle">OFF</button>
-                            <span class="fx-label">POLY MODE</span>
+                            <button id="polyToggle" class="fx-toggle"><span class="led"></span>OFF</button>
+                            <span class="fx-label">POLY 303</span>
                         </div>
-                        <div class="fx-knob-row">
-                            <div class="knob-wrapper">
-                                <input type="range" id="polySteps" min="3" max="16" value="16">
-                                <label>303 STEPS</label>
-                            </div>
-                            <div class="knob-wrapper">
-                                <input type="range" id="timeStretch" min="25" max="400" value="100">
-                                <label>SPEED %</label>
-                            </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="polySteps" data-knob data-format="int" min="3" max="16" value="16">
+                            <label>303 STEPS</label>
                         </div>
-                        <button id="halftimeBtn" class="fx-btn chaos-btn">HALFTIME</button>
-                        <button id="doubletimeBtn" class="fx-btn chaos-btn">DOUBLETIME</button>
-                        <button id="tripletBtn" class="fx-btn chaos-btn">TRIPLET</button>
+                        <div class="knob-wrapper">
+                            <input type="range" id="timeStretch" data-knob data-format="pct" min="25" max="400" value="100">
+                            <label>SPEED</label>
+                        </div>
+                    </div>
+                    <div class="fx-row chaos-btns">
+                        <button id="halftimeBtn" class="hw-btn hw-sm sw" title="速度 50%">HALF</button>
+                        <button id="doubletimeBtn" class="hw-btn hw-sm sw" title="速度 200%">DOUBLE</button>
+                        <button id="tripletBtn" class="hw-btn hw-sm sw" title="速度 150%">×1.5</button>
+                        <button id="screamBtn" class="hw-btn hw-sm btn-danger" title="303を極端な設定に">SCREAM</button>
+                        <button id="robotModeBtn" class="hw-btn hw-sm btn-chaos" title="303の音色とラインをランダムに（音楽的な範囲で）">ROBOT ACID</button>
+                        <button id="drunkModeBtn" class="hw-btn hw-sm btn-chaos" title="テンポとスイングがふらつく"><span class="led"></span>DRUNK</button>
+                        <button id="randomizeAllBtn" class="hw-btn hw-sm btn-nuke" title="全パターン・音色・テンポを再生成（COMPOSEと同じ生成器）">RANDOMIZE ALL</button>
                     </div>
                 </div>
 
-                <!-- Randomize Everything -->
-                <div class="fx-panel danger-panel">
-                    <h3 class="fx-title">💀 TOTAL DESTRUCTION</h3>
-                    <div class="fx-row">
-                        <button id="randomizeAllBtn" class="fx-btn nuke-btn">☢ RANDOMIZE ALL ☢</button>
-                        <button id="drunkModeBtn" class="fx-btn nuke-btn">🍺 DRUNK MODE</button>
-                        <button id="robotModeBtn" class="fx-btn nuke-btn">🤖 ROBOT ACID</button>
-                    </div>
-                </div>
-            </section>
-        </main>
-
-        <footer class="footer">
-            <div class="master-volume">
-                <label>MASTER VOL</label>
-                <input type="range" id="masterVol" min="0" max="100" value="75">
             </div>
-            <div class="status">
-                <span id="statusText">READY</span>
-            </div>
-        </footer>
-    </div>
+        </section>
+    </main>
 
-    <script src="audio-engine.js"></script>
-    <script src="tr808.js"></script>
-    <script src="tb303.js"></script>
-    <script src="chaos-fx.js"></script>
-    <script src="sequencer.js"></script>
-    <script src="app.js"></script>
+    <!-- ================= FOOTER ================= -->
+    <footer class="unit unit-footer">
+        <div class="master">
+            <div class="knob-wrapper">
+                <input type="range" id="masterVol" data-knob data-format="pct" min="0" max="100" value="75">
+                <label>MASTER</label>
+            </div>
+        </div>
+        <div class="legend">
+            <span><kbd>SPACE</kbd> PLAY/STOP</span>
+            <span><kbd>1</kbd><kbd>2</kbd> MODE</span>
+            <span><kbd>←</kbd><kbd>→</kbd> PATTERN</span>
+            <span><kbd>DBL-CLICK</kbd> KNOB RESET</span>
+            <span><kbd>SHIFT</kbd>+DRAG FINE</span>
+        </div>
+        <div class="footer-tools">
+            <span class="autosave" id="autosaveLabel">AUTOSAVE</span>
+            <button id="resetAllBtn" class="hw-btn hw-xs" title="保存データを消去して初期化">RESET</button>
+        </div>
+    </footer>
+</div>
+
+<script src="audio-engine.js"></script>
+<script src="generator.js"></script>
+<script src="tr808.js"></script>
+<script src="tb303.js"></script>
+<script src="chaos-fx.js"></script>
+<script src="sequencer.js"></script>
+<script src="knobs.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
