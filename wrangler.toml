@@ -1,0 +1,5 @@
+# Cloudflare Pages 設定（静的サイト、ビルド不要）
+# デプロイ: npx wrangler pages deploy
+name = "music-tool"
+pages_build_output_dir = "."
+compatibility_date = "2026-10-02"
