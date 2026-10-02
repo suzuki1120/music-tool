@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SYNTH SEQUENCER - TR-808 / TB-303</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <header class="header">
+            <h1 class="logo">SYNTH <span>SEQUENCER</span></h1>
+            <div class="transport">
+                <button id="playBtn" class="btn btn-play">▶ PLAY</button>
+                <button id="stopBtn" class="btn btn-stop">■ STOP</button>
+                <div class="bpm-control">
+                    <label>BPM</label>
+                    <input type="range" id="bpmSlider" min="20" max="300" value="128">
+                    <span id="bpmValue">128</span>
+                </div>
+                <div class="swing-control">
+                    <label>SWING</label>
+                    <input type="range" id="swingSlider" min="0" max="100" value="0">
+                    <span id="swingValue">0%</span>
+                </div>
+            </div>
+        </header>
+
+        <nav class="mode-switch">
+            <button id="modeInst" class="mode-btn active" data-mode="instruments">🎵 INSTRUMENTS</button>
+            <button id="modeFX" class="mode-btn" data-mode="fx">☢ CHAOS FX</button>
+        </nav>
+
+        <main class="sequencer-container">
+            <!-- TR-808 Section -->
+            <section id="section808" class="sequencer-section active">
+                <div class="section-header">
+                    <h2>TR-808 DRUM MACHINE</h2>
+                    <div class="pattern-controls">
+                        <label>PATTERN</label>
+                        <select id="pattern808">
+                            <option value="0">A1</option>
+                            <option value="1">A2</option>
+                            <option value="2">B1</option>
+                            <option value="3">B2</option>
+                        </select>
+                        <button id="clear808" class="btn btn-small">CLEAR</button>
+                    </div>
+                </div>
+                <div class="step-indicator" id="stepIndicator808"></div>
+                <div class="drum-grid" id="drumGrid"></div>
+                <div class="drum-mixer" id="drumMixer"></div>
+            </section>
+
+            <!-- TB-303 Section -->
+            <section id="section303" class="sequencer-section active">
+                <div class="section-header">
+                    <h2>TB-303 BASS LINE</h2>
+                    <div class="pattern-controls">
+                        <label>PATTERN</label>
+                        <select id="pattern303">
+                            <option value="0">A1</option>
+                            <option value="1">A2</option>
+                            <option value="2">B1</option>
+                            <option value="3">B2</option>
+                        </select>
+                        <button id="clear303" class="btn btn-small">CLEAR</button>
+                    </div>
+                </div>
+                <div class="synth-controls">
+                    <div class="knob-group">
+                        <div class="knob-wrapper">
+                            <input type="range" id="cutoff" class="knob" min="100" max="5000" value="800">
+                            <label>CUTOFF</label>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="resonance" class="knob" min="0" max="30" value="15">
+                            <label>RESONANCE</label>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="envMod" class="knob" min="0" max="100" value="50">
+                            <label>ENV MOD</label>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="decay" class="knob" min="0.05" max="2" value="0.3" step="0.05">
+                            <label>DECAY</label>
+                        </div>
+                        <div class="knob-wrapper">
+                            <input type="range" id="accent" class="knob" min="0" max="100" value="50">
+                            <label>ACCENT</label>
+                        </div>
+                    </div>
+                    <div class="wave-select">
+                        <label>WAVE</label>
+                        <button id="waveSaw" class="wave-btn active">SAW</button>
+                        <button id="waveSqr" class="wave-btn">SQR</button>
+                    </div>
+                </div>
+                <div class="step-indicator" id="stepIndicator303"></div>
+                <div class="bass-grid" id="bassGrid"></div>
+                <div class="note-controls">
+                    <div class="octave-select">
+                        <label>OCTAVE</label>
+                        <button class="oct-btn" data-oct="1">1</button>
+                        <button class="oct-btn active" data-oct="2">2</button>
+                        <button class="oct-btn" data-oct="3">3</button>
+                    </div>
+                    <div class="note-select" id="noteSelect"></div>
+                </div>
+            </section>
+            <!-- CHAOS FX Section -->
+            <section id="sectionFX" class="sequencer-section">
+                <div class="section-header">
+                    <h2>☢ CHAOS LABORATORY ☢</h2>
+                </div>
+
+                <!-- Glitch / Stutter -->
+                <div class="fx-panel">
+                    <h3 class="fx-title">🔥 GLITCH / STUTTER</h3>
+                    <div class="fx-row">
+                        <button id="stutterBtn" class="fx-btn pulse-btn">STUTTER</button>
+                        <div class="fx-knob-row">
+                            <div class="knob-wrapper">
+                                <input type="range" id="stutterRate" min="1" max="32" value="8">
+                                <label>RATE</label>
+                            </div>
+                            <div class="knob-wrapper">
+                                <input type="range" id="stutterDecay" min="0" max="100" value="30">
+                                <label>DECAY</label>
+                            </div>
+                        </div>
+                        <button id="tapeStopBtn" class="fx-btn danger-btn">TAPE STOP</button>
+                        <button id="vinylBrakeBtn" class="fx-btn danger-btn">VINYL BRAKE</button>
+                    </div>
+                </div>
+
+                <!-- Bit Crusher / Lo-Fi -->
+                <div class="fx-panel">
+                    <h3 class="fx-title">👾 BIT CRUSHER / LO-FI</h3>
+                    <div class="fx-row">
+                        <div class="fx-toggle-group">
+                            <button id="bitCrushToggle" class="fx-toggle">OFF</button>
+                            <span class="fx-label">BIT CRUSH</span>
+                        </div>
+                        <div class="fx-knob-row">
+                            <div class="knob-wrapper">
+                                <input type="range" id="bitDepth" min="1" max="16" value="8">
+                                <label>BITS</label>
+                            </div>
+                            <div class="knob-wrapper">
+                                <input type="range" id="sampleRateReduce" min="1" max="50" value="1">
+                                <label>DOWNSAMPLE</label>
+                            </div>
+                            <div class="knob-wrapper">
+                                <input type="range" id="crushMix" min="0" max="100" value="50">
+                                <label>MIX</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Delay -->
+                <div class="fx-panel">
+                    <h3 class="fx-title">🌀 DELAY / ECHO</h3>
+                    <div class="fx-row">
+                        <div class="fx-toggle-group">
+                            <button id="delayToggle" class="fx-toggle">OFF</button>
+                            <span class="fx-label">DELAY</span>
+                        </div>
+                        <div class="fx-knob-row">
+                            <div class="knob-wrapper">
+                                <input type="range" id="delayTime" min="1" max="16" value="4">
+                                <label>TIME (1/16)</label>
+                            </div>
+                            <div class="knob-wrapper">
+                                <input type="range" id="delayFeedback" min="0" max="95" value="50">
+                                <label>FEEDBACK</label>
+                            </div>
+                            <div class="knob-wrapper">
+                                <input type="range" id="delayFilter" min="200" max="8000" value="3000">
+                                <label>FILTER</label>
+                            </div>
+                            <div class="knob-wrapper">
+                                <input type="range" id="delayMix" min="0" max="100" value="30">
+                                <label>MIX</label>
+                            </div>
+                        </div>
+                        <div class="delay-mode-select">
+                            <button class="delay-mode-btn active" data-mode="normal">MONO</button>
+                            <button class="delay-mode-btn" data-mode="pingpong">PING PONG</button>
+                            <button class="delay-mode-btn" data-mode="reverse">REVERSE</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pattern Chaos -->
+                <div class="fx-panel">
+                    <h3 class="fx-title">🎲 PATTERN CHAOS</h3>
+                    <div class="fx-row">
+                        <div class="chaos-btns">
+                            <button id="euclideanBtn" class="fx-btn chaos-btn">EUCLIDEAN</button>
+                            <button id="mutateBtn" class="fx-btn chaos-btn">MUTATE</button>
+                            <button id="reverseBtn" class="fx-btn chaos-btn">REVERSE</button>
+                            <button id="randomAcidBtn" class="fx-btn chaos-btn">ACID RANDOM</button>
+                            <button id="palindromeBtn" class="fx-btn chaos-btn">PALINDROME</button>
+                            <button id="shiftLBtn" class="fx-btn chaos-btn">← SHIFT</button>
+                            <button id="shiftRBtn" class="fx-btn chaos-btn">SHIFT →</button>
+                        </div>
+                    </div>
+                    <div class="fx-row">
+                        <div class="fx-knob-row">
+                            <div class="knob-wrapper">
+                                <input type="range" id="euclideanHits" min="1" max="16" value="5">
+                                <label>HITS</label>
+                            </div>
+                            <div class="knob-wrapper">
+                                <input type="range" id="euclideanRotate" min="0" max="15" value="0">
+                                <label>ROTATE</label>
+                            </div>
+                            <div class="knob-wrapper">
+                                <input type="range" id="mutateAmount" min="1" max="100" value="30">
+                                <label>CHAOS %</label>
+                            </div>
+                            <div class="knob-wrapper">
+                                <input type="range" id="probability" min="0" max="100" value="100">
+                                <label>PROB</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Reverb / Freeze -->
+                <div class="fx-panel">
+                    <h3 class="fx-title">🌌 REVERB / FREEZE</h3>
+                    <div class="fx-row">
+                        <div class="fx-toggle-group">
+                            <button id="reverbToggle" class="fx-toggle">OFF</button>
+                            <span class="fx-label">REVERB</span>
+                        </div>
+                        <div class="fx-knob-row">
+                            <div class="knob-wrapper">
+                                <input type="range" id="reverbDecay" min="0.5" max="10" step="0.1" value="2.5">
+                                <label>DECAY</label>
+                            </div>
+                            <div class="knob-wrapper">
+                                <input type="range" id="reverbMix" min="0" max="100" value="40">
+                                <label>MIX</label>
+                            </div>
+                        </div>
+                        <button id="freezeBtn" class="fx-btn danger-btn">❄ FREEZE</button>
+                    </div>
+                </div>
+
+                <!-- Phaser -->
+                <div class="fx-panel">
+                    <h3 class="fx-title">🌊 PHASER</h3>
+                    <div class="fx-row">
+                        <div class="fx-toggle-group">
+                            <button id="phaserToggle" class="fx-toggle">OFF</button>
+                            <span class="fx-label">PHASER</span>
+                        </div>
+                        <div class="fx-knob-row">
+                            <div class="knob-wrapper">
+                                <input type="range" id="phaserRate" min="0.1" max="10" step="0.1" value="0.5">
+                                <label>RATE</label>
+                            </div>
+                            <div class="knob-wrapper">
+                                <input type="range" id="phaserDepth" min="100" max="3000" value="800">
+                                <label>DEPTH</label>
+                            </div>
+                            <div class="knob-wrapper">
+                                <input type="range" id="phaserMix" min="0" max="100" value="50">
+                                <label>MIX</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ring Modulator -->
+                <div class="fx-panel">
+                    <h3 class="fx-title">🛸 RING MODULATOR</h3>
+                    <div class="fx-row">
+                        <div class="fx-toggle-group">
+                            <button id="ringModToggle" class="fx-toggle">OFF</button>
+                            <span class="fx-label">RING MOD</span>
+                        </div>
+                        <div class="fx-knob-row">
+                            <div class="knob-wrapper">
+                                <input type="range" id="ringModFreq" min="20" max="3000" value="200">
+                                <label>FREQ</label>
+                            </div>
+                            <div class="knob-wrapper">
+                                <input type="range" id="ringModMix" min="0" max="100" value="50">
+                                <label>MIX</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wave Folder -->
+                <div class="fx-panel">
+                    <h3 class="fx-title">🌀 WAVE FOLDER</h3>
+                    <div class="fx-row">
+                        <div class="fx-toggle-group">
+                            <button id="waveFolderToggle" class="fx-toggle">OFF</button>
+                            <span class="fx-label">FOLDER</span>
+                        </div>
+                        <div class="fx-knob-row">
+                            <div class="knob-wrapper">
+                                <input type="range" id="foldAmount" min="1" max="20" step="0.5" value="5">
+                                <label>FOLD</label>
+                            </div>
+                            <div class="knob-wrapper">
+                                <input type="range" id="foldMix" min="0" max="100" value="50">
+                                <label>MIX</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Auto Pan -->
+                <div class="fx-panel">
+                    <h3 class="fx-title">🔄 AUTO PANNER</h3>
+                    <div class="fx-row">
+                        <div class="fx-toggle-group">
+                            <button id="autoPanToggle" class="fx-toggle">OFF</button>
+                            <span class="fx-label">AUTO PAN</span>
+                        </div>
+                        <div class="fx-knob-row">
+                            <div class="knob-wrapper">
+                                <input type="range" id="autoPanRate" min="0.1" max="20" step="0.1" value="2">
+                                <label>RATE</label>
+                            </div>
+                            <div class="knob-wrapper">
+                                <input type="range" id="autoPanDepth" min="0" max="100" value="80">
+                                <label>DEPTH</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mad Modulators -->
+                <div class="fx-panel">
+                    <h3 class="fx-title">😈 MAD MODULATORS</h3>
+                    <div class="fx-row">
+                        <div class="fx-toggle-group">
+                            <button id="chaosLFOToggle" class="fx-toggle">OFF</button>
+                            <span class="fx-label">CHAOS LFO</span>
+                        </div>
+                        <div class="fx-toggle-group">
+                            <button id="glitchJumpToggle" class="fx-toggle">OFF</button>
+                            <span class="fx-label">GLITCH JUMP</span>
+                        </div>
+                        <div class="fx-toggle-group">
+                            <button id="earthquakeToggle" class="fx-toggle">OFF</button>
+                            <span class="fx-label">EARTHQUAKE</span>
+                        </div>
+                        <button id="screamBtn" class="fx-btn nuke-btn">🔊 SCREAM</button>
+                    </div>
+                </div>
+
+                <!-- Polyrhythm -->
+                <div class="fx-panel">
+                    <h3 class="fx-title">🔀 POLYRHYTHM / TIME WARP</h3>
+                    <div class="fx-row">
+                        <div class="fx-toggle-group">
+                            <button id="polyToggle" class="fx-toggle">OFF</button>
+                            <span class="fx-label">POLY MODE</span>
+                        </div>
+                        <div class="fx-knob-row">
+                            <div class="knob-wrapper">
+                                <input type="range" id="polySteps" min="3" max="16" value="16">
+                                <label>303 STEPS</label>
+                            </div>
+                            <div class="knob-wrapper">
+                                <input type="range" id="timeStretch" min="25" max="400" value="100">
+                                <label>SPEED %</label>
+                            </div>
+                        </div>
+                        <button id="halftimeBtn" class="fx-btn chaos-btn">HALFTIME</button>
+                        <button id="doubletimeBtn" class="fx-btn chaos-btn">DOUBLETIME</button>
+                        <button id="tripletBtn" class="fx-btn chaos-btn">TRIPLET</button>
+                    </div>
+                </div>
+
+                <!-- Randomize Everything -->
+                <div class="fx-panel danger-panel">
+                    <h3 class="fx-title">💀 TOTAL DESTRUCTION</h3>
+                    <div class="fx-row">
+                        <button id="randomizeAllBtn" class="fx-btn nuke-btn">☢ RANDOMIZE ALL ☢</button>
+                        <button id="drunkModeBtn" class="fx-btn nuke-btn">🍺 DRUNK MODE</button>
+                        <button id="robotModeBtn" class="fx-btn nuke-btn">🤖 ROBOT ACID</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <div class="master-volume">
+                <label>MASTER VOL</label>
+                <input type="range" id="masterVol" min="0" max="100" value="75">
+            </div>
+            <div class="status">
+                <span id="statusText">READY</span>
+            </div>
+        </footer>
+    </div>
+
+    <script src="audio-engine.js"></script>
+    <script src="tr808.js"></script>
+    <script src="tb303.js"></script>
+    <script src="chaos-fx.js"></script>
+    <script src="sequencer.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
