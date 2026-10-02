@@ -125,14 +125,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // debugging / power-user handle
     window.SynthSeq = { engine: audioEngine, sequencer, tr808, tb303, stab, sampler, chaosFx, midi, recorder, MusicGen };
 
+    // Audio unlock. iOS Safari only counts touchend / click / keydown as user activation
+    // (pointerdown and touchstart are not enough), and the context can drop back to
+    // 'interrupted' after a call or screen lock, so the listeners stay armed and are cheap.
     const unlock = () => {
         audioEngine.init();
         audioEngine.resume();
-        document.removeEventListener('pointerdown', unlock);
-        document.removeEventListener('keydown', unlock);
     };
-    document.addEventListener('pointerdown', unlock);
-    document.addEventListener('keydown', unlock);
+    ['pointerdown', 'touchend', 'click', 'keydown'].forEach(ev => document.addEventListener(ev, unlock, { passive: true }));
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) audioEngine.resume(); });
 
     // ============================================================ builders
     function buildSelects() {

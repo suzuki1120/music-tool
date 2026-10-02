@@ -47,6 +47,8 @@ class AudioEngine {
 
         this.ctx = new AC({ latencyHint: 'interactive' });
         const ctx = this.ctx;
+        // iOS: let Web Audio play through the ringer/silent switch (Safari 17+).
+        try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* ignore */ }
 
         this.input = ctx.createGain();
         this.duckBus = ctx.createGain();
@@ -107,7 +109,8 @@ class AudioEngine {
     }
 
     resume() {
-        if (this.ctx && this.ctx.state === 'suspended') return this.ctx.resume();
+        // 'interrupted' is iOS-specific (phone call, screen lock, another app took the output).
+        if (this.ctx && this.ctx.state !== 'running' && this.ctx.state !== 'closed') return this.ctx.resume().catch(() => {});
         return Promise.resolve();
     }
 
