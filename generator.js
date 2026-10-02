@@ -47,78 +47,96 @@ const MusicGen = (() => {
         techno: {
             name: 'TECHNO', bpm: [128, 140], swing: [0, 12], density: ['mid', 'dense'],
             scales: ['minorPenta', 'phrygian', 'aeolian'],
-            kicks: [[0, 4, 8, 12]], kickExtra: [[14], [10], [15]], kickExtraP: 0.3,
-            clapP: 0.85, snareP: 0.3, hatModes: ['off8', '16', '8', 'off8-16'], openP: 0.55,
+            kicks: [[0, 4, 8, 12]], kickExtra: [[14], [10], [15], [7, 14], [11], [10, 15]], kickExtraP: 0.45,
+            backbeats: [{ clap: [4, 12] }, { clap: [4, 12] }, { clap: [4, 12], ghost: ['clap', [15], 55] }, { snare: [4, 12] },
+                { clap: [4, 12], snare: [12] }, { clap: [12] }, { rimshot: [4, 12] }, { clap: [4, 12], ghost: ['snare', [7], 50] }],
+            hatModes: ['off8', '16', '8', 'off8-16', 'off8-ghost', 'broken', 'shuffle16'], openP: 0.55,
+            line: { shapes: { pedal: 3, riff: 2, octave: 2, walk: 1, sync: 2 }, oct: [1, 2], slideP: 0.35 },
             perc: { rimshot: { p: 0.12, max: 3 }, cowbell: { p: 0.05, max: 1 }, tom_lo: { p: 0.06, max: 1 }, tom_hi: { p: 0.06, max: 1 } },
             cymbalP: 0.3,
             synth: { cutoff: [350, 1400], resonance: [8, 20], envMod: [40, 80], decay: [0.18, 0.45], accent: [50, 85], sawP: 0.7 },
             stab: { p: 0.55, oct: [2, 3], rhythms: [[6, 14], [0], [3, 11], [10], [2, 6, 10, 14]],
-                prog: [[0, 0, 0, 0], [0, 0, 3, 0], [0, 0, 4, 3], [0, 4, 0, 3]], seventhP: 0.3,
+                prog: [[0, 0, 0, 0], [0, 0, 3, 0], [0, 0, 4, 3], [0, 4, 0, 3], [0, 3, 4, 4], [0, 0, 5, 3], [0, 2, 0, 4], [0, 5, 0, 3]], seventhP: 0.3,
                 cutoff: [500, 1600], decay: [0.12, 0.3], release: [0.1, 0.3], chorus: [20, 60] },
             kit: { kick: 0.5, snare: 0.5, clap: 0.5, hihat_c: 0.6, hihat_o: 0.6, rimshot: 0.3, cymbal: 0.4 }
         },
         house: {
             name: 'HOUSE', bpm: [120, 128], swing: [8, 25], density: ['sparse', 'mid'],
             scales: ['dorian', 'minorPenta', 'majorPenta'],
-            kicks: [[0, 4, 8, 12]], kickExtra: [[15], [11]], kickExtraP: 0.2,
-            clapP: 0.95, snareP: 0.15, hatModes: ['off8', 'off8-16', '16'], openP: 0.85,
+            kicks: [[0, 4, 8, 12]], kickExtra: [[15], [11], [7], [14, 15]], kickExtraP: 0.3,
+            backbeats: [{ clap: [4, 12] }, { clap: [4, 12] }, { clap: [4, 12], snare: [4, 12] }, { clap: [4, 12], ghost: ['clap', [13], 60] },
+                { clap: [4, 12], ghost: ['clap', [3, 11], 45] }, { snare: [4, 12] }, { clap: [4, 12], rimshot: [7, 15] }],
+            hatModes: ['off8', 'off8-16', '16', 'off8-ghost', 'shuffle16', 'sparse'], openP: 0.85,
+            line: { shapes: { pedal: 2, riff: 3, octave: 2, walk: 2, sync: 3 }, oct: [1, 2], slideP: 0.3 },
             perc: { rimshot: { p: 0.12, max: 3 }, cowbell: { p: 0.1, max: 2 }, tom_lo: { p: 0.05, max: 1 }, tom_hi: { p: 0.08, max: 2 } },
             cymbalP: 0.25,
             synth: { cutoff: [300, 1000], resonance: [5, 14], envMod: [30, 60], decay: [0.2, 0.5], accent: [40, 70], sawP: 0.6 },
             stab: { p: 0.9, oct: [3, 3, 4], rhythms: [[2, 6, 10, 14], [2, 10], [6, 14], [3, 11], [2, 6, 10]],
-                prog: [[0, 0, 3, 4], [0, 5, 3, 4], [0, 3, 4, 0], [0, 2, 3, 4], [0, 0, 5, 4]], seventhP: 0.65,
+                prog: [[0, 0, 3, 4], [0, 5, 3, 4], [0, 3, 4, 0], [0, 2, 3, 4], [0, 0, 5, 4], [0, 4, 5, 3], [0, 0, 2, 5], [0, 3, 0, 5], [0, 5, 4, 4]], seventhP: 0.65,
                 cutoff: [900, 2600], decay: [0.15, 0.35], release: [0.15, 0.4], chorus: [40, 80] },
             kit: { kick: 0.4, clap: 0.7, hihat_c: 0.7, hihat_o: 0.7, rimshot: 0.3 }
         },
         acid: {
             name: 'ACID', bpm: [130, 145], swing: [0, 10], density: ['mid', 'dense'],
             scales: ['minorPenta', 'phrygian', 'blues'],
-            kicks: [[0, 4, 8, 12]], kickExtra: [[14], [10, 14]], kickExtraP: 0.35,
-            clapP: 0.8, snareP: 0.5, hatModes: ['16', 'off8-16', 'off8'], openP: 0.6,
+            kicks: [[0, 4, 8, 12]], kickExtra: [[14], [10, 14], [15], [7], [11, 14]], kickExtraP: 0.45,
+            backbeats: [{ clap: [4, 12] }, { snare: [4, 12] }, { clap: [4, 12], snare: [4, 12] }, { snare: [4, 12], ghost: ['snare', [15], 50] },
+                { clap: [4, 12], ghost: ['clap', [7], 45] }, { snare: [12] }, { clap: [4, 12], rimshot: [10] }],
+            hatModes: ['16', 'off8-16', 'off8', 'off8-ghost', 'shuffle16', 'broken'], openP: 0.6,
+            line: { shapes: { pedal: 2, riff: 3, octave: 3, walk: 2, sync: 2 }, oct: [1, 2], slideP: 0.55 },
             perc: { rimshot: { p: 0.15, max: 3 }, cowbell: { p: 0.04, max: 1 }, tom_lo: { p: 0.05, max: 1 }, tom_hi: { p: 0.05, max: 1 } },
             cymbalP: 0.3,
             synth: { cutoff: [450, 1800], resonance: [12, 25], envMod: [55, 95], decay: [0.15, 0.4], accent: [60, 95], sawP: 0.6 },
             stab: { p: 0.35, oct: [2, 3], rhythms: [[10], [2, 10], [6]],
-                prog: [[0, 0, 0, 0], [0, 0, 3, 0]], seventhP: 0.2,
+                prog: [[0, 0, 0, 0], [0, 0, 3, 0], [0, 0, 0, 4], [0, 3, 0, 4]], seventhP: 0.2,
                 cutoff: [400, 1200], decay: [0.1, 0.25], release: [0.08, 0.2], chorus: [10, 40] },
             kit: { hihat_c: 0.15, hihat_o: 0.15 }
         },
         electro: {
             name: 'ELECTRO', bpm: [118, 132], swing: [0, 8], density: ['sparse', 'mid'],
             scales: ['minorPenta', 'blues', 'aeolian'],
-            kicks: [[0, 6, 10], [0, 7, 10, 14], [0, 6, 8, 11], [0, 3, 6, 10]], kickExtra: [[13], [14]], kickExtraP: 0.3,
-            clapP: 0.6, snareP: 0.95, hatModes: ['8', 'off8-16', '16'], openP: 0.4,
+            kicks: [[0, 6, 10], [0, 7, 10, 14], [0, 6, 8, 11], [0, 3, 6, 10], [0, 5, 8, 10], [0, 6, 8, 14], [0, 3, 8, 11, 14], [0, 10, 11]], kickExtra: [[13], [14], [15], [2]], kickExtraP: 0.35,
+            backbeats: [{ snare: [4, 12] }, { snare: [4, 12] }, { snare: [4, 12], clap: [4, 12] }, { snare: [4, 12], ghost: ['snare', [7, 15], 55] },
+                { snare: [4, 11] }, { clap: [4, 12] }, { snare: [4, 12], ghost: ['clap', [10], 50] }],
+            hatModes: ['8', 'off8-16', '16', 'broken', 'shuffle16', 'off8-ghost'], openP: 0.4,
+            line: { shapes: { octave: 4, riff: 2, pedal: 2, sync: 2, walk: 1 }, oct: [1, 2], slideP: 0.25 },
             perc: { rimshot: { p: 0.1, max: 2 }, cowbell: { p: 0.18, max: 2 }, tom_lo: { p: 0.1, max: 2 }, tom_hi: { p: 0.12, max: 2 } },
             cymbalP: 0.2,
             synth: { cutoff: [250, 1200], resonance: [6, 16], envMod: [35, 70], decay: [0.15, 0.4], accent: [40, 75], sawP: 0.5 },
             stab: { p: 0.55, oct: [3, 4], rhythms: [[3, 11], [6], [3, 11, 14], [7, 15]],
-                prog: [[0, 0, 3, 0], [0, 3, 0, 4], [0, 0, 5, 3]], seventhP: 0.4,
+                prog: [[0, 0, 3, 0], [0, 3, 0, 4], [0, 0, 5, 3], [0, 0, 0, 3], [0, 4, 3, 0], [0, 5, 0, 4]], seventhP: 0.4,
                 cutoff: [600, 2000], decay: [0.1, 0.3], release: [0.1, 0.3], chorus: [30, 70] },
             kit: {}
         },
         minimal: {
             name: 'MINIMAL', bpm: [124, 132], swing: [0, 15], density: ['sparse'],
             scales: ['minorPenta', 'aeolian', 'dorian'],
-            kicks: [[0, 4, 8, 12]], kickExtra: [], kickExtraP: 0,
-            clapP: 0.35, snareP: 0.05, hatModes: ['off8', '8'], openP: 0.35,
+            kicks: [[0, 4, 8, 12]], kickExtra: [[14], [11]], kickExtraP: 0.12,
+            backbeats: [{ clap: [4, 12] }, { rimshot: [4, 12] }, { clap: [12] }, {}, { rimshot: [4, 12], ghost: ['rimshot', [7, 15], 45] },
+                { clap: [4, 12], ghost: ['clap', [11], 40] }, { snare: [12] }],
+            hatModes: ['off8', '8', 'sparse', 'off8-ghost', 'broken'], openP: 0.35,
+            line: { shapes: { pedal: 4, sync: 2, riff: 1, walk: 1, octave: 1 }, oct: [1, 2], slideP: 0.3 },
             perc: { rimshot: { p: 0.18, max: 3 }, cowbell: { p: 0.06, max: 1 }, tom_lo: { p: 0.1, max: 1 }, tom_hi: { p: 0.08, max: 1 } },
             cymbalP: 0.1,
             synth: { cutoff: [200, 800], resonance: [4, 12], envMod: [20, 50], decay: [0.25, 0.6], accent: [30, 60], sawP: 0.5 },
             stab: { p: 0.4, oct: [3, 4], rhythms: [[14], [7], [10], [6, 14]],
-                prog: [[0, 0, 0, 0], [0, 0, 0, 3]], seventhP: 0.5,
+                prog: [[0, 0, 0, 0], [0, 0, 0, 3], [0, 0, 5, 0], [0, 3, 0, 0], [0, 0, 4, 0]], seventhP: 0.5,
                 cutoff: [400, 1200], decay: [0.15, 0.4], release: [0.2, 0.5], chorus: [30, 70] },
             kit: { hihat_c: 0.5, hihat_o: 0.5, rimshot: 0.3 }
         },
         breaks: {
             name: 'BREAKS', bpm: [92, 104], swing: [10, 30], density: ['mid'],
             scales: ['minorPenta', 'blues', 'dorian'],
-            kicks: [[0, 7, 10], [0, 10], [0, 6, 10, 15], [0, 3, 10]], kickExtra: [[14], [8]], kickExtraP: 0.3,
-            clapP: 0.3, snareP: 0.98, hatModes: ['8', '16', 'off8-16'], openP: 0.4,
+            kicks: [[0, 7, 10], [0, 10], [0, 6, 10, 15], [0, 3, 10], [0, 2, 10], [0, 7, 8, 10], [0, 6, 10], [0, 10, 11], [0, 3, 6, 10, 14]], kickExtra: [[14], [8], [13], [15]], kickExtraP: 0.35,
+            backbeats: [{ snare: [4, 12] }, { snare: [4, 12] }, { snare: [4, 12], ghost: ['snare', [7, 15], 55] }, { snare: [4, 12], clap: [4, 12] },
+                { snare: [4, 12], ghost: ['snare', [9, 15], 50] }, { snare: [4, 11, 12] }, { snare: [4, 12], ghost: ['snare', [14], 60] }],
+            hatModes: ['8', '16', 'off8-16', 'broken', 'shuffle16', 'off8-ghost'], openP: 0.4,
+            line: { shapes: { riff: 3, walk: 2, pedal: 2, octave: 1, sync: 2 }, oct: [1, 2], slideP: 0.35 },
             perc: { rimshot: { p: 0.1, max: 2 }, cowbell: { p: 0.06, max: 1 }, tom_lo: { p: 0.1, max: 2 }, tom_hi: { p: 0.1, max: 2 } },
             cymbalP: 0.3,
             synth: { cutoff: [250, 900], resonance: [5, 14], envMod: [30, 65], decay: [0.2, 0.5], accent: [40, 70], sawP: 0.7 },
             stab: { p: 0.6, oct: [3, 4], rhythms: [[2, 10], [3, 11], [6, 14], [2, 7, 10]],
-                prog: [[0, 0, 3, 4], [0, 3, 0, 4], [0, 0, 5, 3]], seventhP: 0.6,
+                prog: [[0, 0, 3, 4], [0, 3, 0, 4], [0, 0, 5, 3], [0, 5, 3, 4], [0, 2, 3, 0], [0, 0, 4, 5]], seventhP: 0.6,
                 cutoff: [700, 2200], decay: [0.15, 0.35], release: [0.15, 0.4], chorus: [30, 70] },
             kit: { snare: 0.6, kick: 0.4 }
         }
@@ -203,11 +221,24 @@ const MusicGen = (() => {
         if (S.kickExtra.length && chance(S.kickExtraP)) pick(S.kickExtra).forEach(i => set('kick', i, 1));
 
         let hasBackbeat = false;
-        if (chance(S.clapP)) { [4, 12].forEach(i => set('clap', i, 1)); hasBackbeat = true; }
-        if (chance(S.snareP)) { [4, 12].forEach(i => set('snare', i, 1)); hasBackbeat = true; }
-        if (!hasBackbeat && chance(0.6)) { [4, 12].forEach(i => set('rimshot', i, 1)); hasBackbeat = true; }
+        if (S.backbeats && S.backbeats.length) {
+            const bb = pick(S.backbeats);
+            ['snare', 'clap', 'rimshot'].forEach(inst => {
+                (bb[inst] || []).forEach(i => set(inst, i, 1));
+                if ((bb[inst] || []).length) hasBackbeat = true;
+            });
+            if (bb.ghost) {
+                const [inst, steps, p] = bb.ghost;
+                steps.forEach(i => { if (!P[inst][i]) { set(inst, i, 1); setExt(P, inst, i, { p }); } });
+            }
+        } else {
+            if (chance(S.clapP)) { [4, 12].forEach(i => set('clap', i, 1)); hasBackbeat = true; }
+            if (chance(S.snareP)) { [4, 12].forEach(i => set('snare', i, 1)); hasBackbeat = true; }
+            if (!hasBackbeat && chance(0.6)) { [4, 12].forEach(i => set('rimshot', i, 1)); hasBackbeat = true; }
+        }
 
         const mode = pick(S.hatModes);
+        const broken = pick([[1, 2, 5, 6, 9, 10, 13, 14], [2, 3, 6, 10, 11, 14], [0, 3, 6, 9, 12, 14], [2, 5, 8, 10, 13, 15], [1, 2, 6, 9, 10, 14]]);
         for (let i = 0; i < 16; i++) {
             const even = i % 2 === 0;
             switch (mode) {
@@ -215,6 +246,10 @@ const MusicGen = (() => {
                 case '8':       if (even) set('hihat_c', i, i % 4 === 0 ? 2 : 1); break;
                 case '16':      set('hihat_c', i, i % 4 === 2 ? 2 : 1); break;
                 case 'off8-16': if (even) set('hihat_c', i, i % 4 === 2 ? 2 : 1); else if (chance(0.4)) { set('hihat_c', i, 1); setExt(P, 'hihat_c', i, { p: 70 }); } break;
+                case 'off8-ghost': if (i % 4 === 2) set('hihat_c', i, 2); else if (!even && chance(0.35)) { set('hihat_c', i, 1); setExt(P, 'hihat_c', i, { p: 50 }); } break;
+                case 'shuffle16': if (even) set('hihat_c', i, i % 4 === 2 ? 2 : 1); else if (i % 4 === 3 && chance(0.7)) set('hihat_c', i, 1); break;
+                case 'sparse':  if (i === 2 || i === 10) set('hihat_c', i, 1); else if (i % 4 === 2 && chance(0.4)) set('hihat_c', i, 1); break;
+                case 'broken':  if (broken.includes(i)) set('hihat_c', i, i % 4 === 2 ? 2 : 1); break;
             }
         }
         let openCount = 0;
@@ -331,27 +366,90 @@ const MusicGen = (() => {
         return weightedPick(items, weights);
     }
 
-    function generateLine({ root = 9, scale = 'minorPenta', density = 'mid', baseOct = null } = {}) {
+    // Rhythm templates (8 steps) per density, plus syncopated ones for the "sync" shape.
+    const RHYTHMS = {
+        sparse: [[1, 0, 0, 1, 0, 0, 1, 0], [1, 0, 0, 0, 1, 0, 0, 0], [1, 0, 1, 0, 0, 0, 1, 0], [1, 0, 0, 1, 0, 0, 0, 1], [1, 0, 0, 0, 1, 0, 1, 0]],
+        mid:    [[1, 0, 1, 1, 0, 1, 1, 0], [1, 1, 0, 1, 0, 1, 0, 1], [1, 0, 1, 0, 1, 0, 1, 1], [1, 0, 0, 1, 1, 0, 1, 0], [1, 1, 0, 1, 1, 0, 1, 0], [1, 0, 1, 0, 1, 1, 0, 1]],
+        dense:  [[1, 1, 1, 1, 0, 1, 1, 1], [1, 1, 0, 1, 1, 1, 0, 1], [1, 1, 1, 0, 1, 1, 1, 1], [1, 0, 1, 1, 1, 1, 0, 1], [1, 1, 1, 1, 1, 0, 1, 1]],
+        sync:   [[1, 0, 1, 0, 0, 1, 0, 1], [1, 0, 0, 1, 0, 1, 0, 1], [1, 0, 0, 1, 0, 0, 1, 1], [0, 1, 0, 1, 0, 1, 1, 0], [1, 0, 1, 0, 0, 1, 1, 0]]
+    };
+    const DEFAULT_SHAPES = { pedal: 3, riff: 2, octave: 2, walk: 1, sync: 2 };
+    const SHAPE_KEYS = Object.keys(DEFAULT_SHAPES);
+
+    /** Pick a melodic shape for a style ("pedal" root-heavy, "riff" motif, "octave" jumps, "walk" stepwise, "sync" offbeat). */
+    function pickShape(S) {
+        const w = (S && S.line && S.line.shapes) || DEFAULT_SHAPES;
+        return weightedPick(Object.keys(w), Object.values(w));
+    }
+
+    function generateLine({ root = 9, scale = 'minorPenta', density = 'mid', baseOct = null, style = null, shape = null } = {}) {
+        const S = STYLES[style] || null;
         const iv = (SCALES[scale] || SCALES.minorPenta).iv;
         const gateP = GATE_P[density] || GATE_P.mid;
-        if (baseOct === null) baseOct = chance(0.6) ? 1 : 2;
+        if (!SHAPE_KEYS.includes(shape)) shape = pickShape(S);
+        const octs = (S && S.line && S.line.oct) || [1, 2];
+        if (baseOct === null) baseOct = pick(octs);
+        baseOct = Math.max(1, Math.min(3, baseOct));
+        const slideP = (S && S.line && typeof S.line.slideP === 'number') ? S.line.slideP : 0.35;
+
+        // rhythm: a template with a little jitter
+        const pool = shape === 'sync' ? RHYTHMS.sync : (RHYTHMS[density] || RHYTHMS.mid);
+        const mask = pick(pool).slice();
+        for (let k = 0; k < 2; k++) {
+            if (!chance(0.55)) continue;
+            const i = rndInt(1, 7);
+            if (!(shape === 'sync' && i % 2 === 0)) mask[i] = mask[i] ? (chance(0.5) ? 0 : 1) : (chance(gateP[i]) ? 1 : 0);
+        }
+
+        // pitch material
+        const fifth = iv.includes(7) ? 7 : iv[Math.floor(iv.length / 2)];
+        const top = iv[iv.length - 1];
+        const motif = [0, pickDegree(iv, true), pickDegree(iv, true)];
+        if (motif[1] === motif[2]) motif[2] = motif[1] === top ? fifth : top;
+        const motifOrder = pick([[0, 1, 0, 2], [0, 0, 1, 2], [0, 1, 2, 1], [0, 2, 1, 0], [0, 1, 1, 2]]);
+        const walkScale = [...iv, ...iv.map(d => d + 12)].filter(d => d < 15);
+        let walkIdx = 0;
+        let nth = 0;
 
         const cell = [];
-        let nonRootRun = 0;
         for (let i = 0; i < 8; i++) {
             const s = emptyStep();
-            s.active = chance(gateP[i]);
+            s.active = !!mask[i];
             if (s.active) {
-                let semis = nonRootRun >= 2 ? 0 : pickDegree(iv);
-                if (i === 0 && chance(0.85)) semis = 0;
-                nonRootRun = semis === 0 ? 0 : nonRootRun + 1;
+                let semis = 0;
                 let oct = baseOct;
-                if (semis === 0 && chance(i % 4 === 0 ? 0.12 : 0.25)) oct += 1;
-                else if (semis !== 0 && chance(0.12)) oct += 1;
+                switch (shape) {
+                    case 'octave':
+                        semis = chance(0.85) ? 0 : pick([fifth, top]);
+                        if (nth % 2 === 1 || (semis === 0 && chance(0.15))) oct += 1;
+                        break;
+                    case 'riff':
+                        semis = i === 0 ? 0 : motif[motifOrder[nth % 4]];
+                        if (semis !== 0 && chance(0.15)) oct += 1;
+                        break;
+                    case 'walk':
+                        if (i === 0) walkIdx = 0;
+                        else {
+                            walkIdx = Math.max(0, Math.min(walkScale.length - 1, walkIdx + (chance(0.5) ? 1 : -1) * rndInt(1, 2)));
+                            if (chance(0.25)) walkIdx = 0;
+                        }
+                        semis = walkScale[walkIdx];
+                        break;
+                    case 'sync':
+                        semis = i % 2 === 0 ? 0 : (chance(0.6) ? pick([fifth, top, 0]) : pickDegree(iv, true));
+                        if (semis === 0 && i % 2 === 1 && chance(0.4)) oct += 1;
+                        break;
+                    case 'pedal':
+                    default:
+                        semis = (i === 0 || chance(0.72)) ? 0 : pickDegree(iv, true);
+                        if (semis === 0 && chance(i % 4 === 0 ? 0.12 : 0.28)) oct += 1;
+                        break;
+                }
                 const p = pitchFor(root, semis, Math.min(oct, 3));
                 s.note = p.note;
                 s.octave = p.octave;
-                s.accent = chance(i % 2 === 0 ? 0.32 : 0.18);
+                s.accent = chance(shape === 'sync' ? (i % 2 === 1 ? 0.4 : 0.2) : (i % 2 === 0 ? 0.32 : 0.18));
+                nth++;
             }
             cell.push(s);
         }
@@ -365,8 +463,6 @@ const MusicGen = (() => {
             half2[i].octave = Math.min(3, p.octave);
         }
         if (chance(0.55)) {
-            const fifth = iv.includes(7) ? 7 : iv[Math.floor(iv.length / 2)];
-            const top = iv[iv.length - 1];
             const third = iv[1];
             const t = pick([[fifth, 0], [top, fifth], [12, top], [third, 0], [top, 12]]);
             [6, 7].forEach((i, k) => {
@@ -393,15 +489,21 @@ const MusicGen = (() => {
             }
         }
 
+        // slides between neighbouring notes of different pitch, with the style's appetite for them
+        line.forEach((s, i) => {
+            const n = line[(i + 1) % 16];
+            if (s.active && n.active && (s.note !== n.note || s.octave !== n.octave) && chance(slideP)) s.slide = true;
+        });
+
         // a few ghost notes on weak steps get a probability so the loop breathes
         line.forEach((s, i) => { if (s.active && i % 4 === 3 && !s.accent && chance(0.3)) s.prob = pick([60, 75]); });
 
-        finishLine(line, density);
+        finishLine(line, density, false);
         return line;
     }
 
     /** Normalise accents / slides so the line stays playable. */
-    function finishLine(line, density = 'mid') {
+    function finishLine(line, density = 'mid', autoSlides = true) {
         const maxSlides = density === 'dense' ? 6 : 5;
         let slides = 0;
         for (let i = 0; i < 16; i++) {
@@ -413,7 +515,7 @@ const MusicGen = (() => {
             if (!cur.active || !next.active) { cur.slide = false; continue; }
             if (cur.slide) { slides++; continue; }
             const differs = cur.note !== next.note || cur.octave !== next.octave;
-            if (slides < maxSlides && chance(differs ? 0.42 : 0.2)) { cur.slide = true; slides++; }
+            if (autoSlides && slides < maxSlides && chance(differs ? 0.42 : 0.2)) { cur.slide = true; slides++; }
         }
         while (slides > maxSlides) {
             const idx = line.map((s, i) => s.slide ? i : -1).filter(i => i >= 0);
@@ -633,13 +735,19 @@ const MusicGen = (() => {
         if (chance(0.5)) base.cymbal[0] = 1;
         const beats = [base, variateBeat(base, 'alt'), variateBeat(base, 'build'), variateBeat(base, 'fill')];
 
-        const L1 = generateLine({ root, scale, density });
+        const shape = pickShape(S);
+        const L1 = generateLine({ root, scale, density, style: styleKey, shape });
         const L2 = variateLine(L1, 0.25, { root, scale, density });
         let L3;
-        if (chance(0.5)) {
+        const roll = Math.random();
+        if (roll < 0.4) {
             L3 = finishLine(quantizeLine(transposeLine(L1, pick([5, 7, -5, 3])), root, scale), density);
-        } else {
+        } else if (roll < 0.7) {
             L3 = variateLine(L1, 0.45, { root, scale, density });
+        } else {
+            // a fresh line in a different shape, same register, for contrast
+            const baseOct = Math.min(3, ...L1.filter(st => st.active).map(st => st.octave)) || 1;
+            L3 = generateLine({ root, scale, density, style: styleKey, baseOct, shape: pick(SHAPE_KEYS.filter(k => k !== shape)) });
         }
         const L4 = variateLine(L3, 0.5, { root, scale, density });
         const lines = [L1, L2, L3, L4];
@@ -701,7 +809,7 @@ const MusicGen = (() => {
 
     return {
         NOTES, INSTRUMENTS, KIT_CAPABLE, SCALES, STYLES, CHORDS, CHORD_KEYS,
-        empty808, emptyLine, emptyStep, emptyStabStep, emptyStabLine,
+        empty808, emptyLine, emptyStep, emptyStabStep, emptyStabLine, SHAPE_KEYS, pickShape,
         setExt, setExtAll, cleanExt, clone808, cloneLine,
         generateBeat, variateBeat,
         generateLine, variateLine, transposeLine, quantizeLine, finishLine,

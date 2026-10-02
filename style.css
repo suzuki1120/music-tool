@@ -1148,3 +1148,51 @@ body.drop-target .rack { outline: 2px dashed var(--csmp); outline-offset: -8px; 
     .sys-grid { grid-template-columns: 1fr; }
     .unit-footer .master { gap: 14px; }
 }
+
+/* ---------- MK-III r2: foldable instrument units, unit mute / solo, unit order ---------- */
+.unit-fold {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    border: 1px solid #000;
+    background: linear-gradient(180deg, #34373e, #212328);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.08) inset, 0 1px 0 #0b0c0e;
+    cursor: pointer;
+}
+.unit-fold:hover { background: linear-gradient(180deg, #3f434b, #272a30); }
+.unit-fold span {
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid var(--ink-dim);
+    transition: transform 0.15s ease;
+}
+.unit-fold:hover span { border-top-color: var(--ink); }
+.unit.collapsed .unit-fold span { transform: rotate(-90deg); }
+.unit-title h2 { cursor: pointer; user-select: none; }
+.unit.collapsed > :not(.unit-head) { display: none !important; }
+.unit.collapsed { padding-bottom: 14px; }
+.unit.collapsed .unit-head { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; box-shadow: none; }
+.unit.collapsed .unit-tools > :not(.unit-order):not(.pat-group) { display: none; }
+
+.unit-ms { display: flex; gap: 3px; margin-left: 8px; }
+.unit-ms .rc { min-width: 26px; padding: 6px 5px 5px; font-size: 10px; }
+.rc-m.part { color: #ff9d93; box-shadow: 0 0 0 1px rgba(255,90,70,0.75) inset, 0 1px 0 #0b0c0e; }
+.rc-s.part { color: #ffd98a; box-shadow: 0 0 0 1px rgba(255,210,63,0.75) inset, 0 1px 0 #0b0c0e; }
+.unit.unit-silent .unit-title h2, .unit.unit-silent .unit-badge { opacity: 0.45; }
+.unit.unit-silent { border-top-color: #4a4e55; }
+
+.unit-order { display: flex; gap: 2px; margin-left: auto; }
+.unit-order .rc { min-width: 22px; padding: 5px 4px 4px; font-size: 8px; }
+.unit-order .rc:disabled { opacity: 0.3; cursor: default; }
+.unit-order .rc:disabled:hover { color: var(--ink-dim); }
+
+@media (max-width: 640px) {
+    .unit-ms { margin-left: 4px; }
+    .unit-order { margin-left: 0; }
+}

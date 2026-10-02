@@ -53,6 +53,8 @@ document.addEventListener('DOMContentLoaded', () => {
         plock: false,
         root: 9,
         scale: 'minorPenta',
+        randomKey: false,
+        randomScale: false,
         style: 'techno',
         locks: { d808: false, d303: false, stab: false, synth: false },
         clip808: null,
@@ -79,6 +81,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const patQueue = [];
     const hist = { undo: [], redo: [], lock: false };
 
+    // instrument unit prefs (fold / order), kept apart from the musical state
+    const UI_KEY = 'synthseq.ui';
+    const UNIT_DEFAULT_ORDER = ['section808', 'section303', 'sectionStab', 'sectionSampler'];
+    const UNIT_GROUPS = {
+        section808: () => tr808.instruments.filter(i => i.group !== 'smp').map(i => i.id),
+        sectionSampler: () => tr808.instruments.filter(i => i.group === 'smp').map(i => i.id),
+        section303: () => ['303'],
+        sectionStab: () => ['stab']
+    };
+    const UNIT_LABELS = { section808: '808', sectionSampler: 'SAMPLER', section303: '303', sectionStab: 'STAB' };
+
     // ============================================================ init
     buildSelects();
     buildGatePresets();
@@ -91,6 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
     buildPatternButtons();
     buildSamplerSlots();
     buildMixerStrips();
+    decorateUnits();
     buildGateSteps();
     Knobs.enhanceAll(document);
     bindTransport();
@@ -130,6 +144,11 @@ document.addEventListener('DOMContentLoaded', () => {
             styleSel.appendChild(o);
         });
         const keySel = $('keySelect');
+        const rndKey = document.createElement('option');
+        rndKey.value = 'random';
+        rndKey.textContent = 'RND';
+        rndKey.title = 'COMPOSE のたびにキーをランダムに選ぶ';
+        keySel.appendChild(rndKey);
         NOTES.forEach((n, i) => {
             const o = document.createElement('option');
             o.value = i;
@@ -137,6 +156,11 @@ document.addEventListener('DOMContentLoaded', () => {
             keySel.appendChild(o);
         });
         const scaleSel = $('scaleSelect');
+        const rndScale = document.createElement('option');
+        rndScale.value = 'random';
+        rndScale.textContent = 'RND';
+        rndScale.title = 'COMPOSE のたびにスタイルに合うスケールをランダムに選ぶ';
+        scaleSel.appendChild(rndScale);
         Object.keys(MusicGen.SCALES).forEach(k => {
             const o = document.createElement('option');
             o.value = k;
@@ -773,6 +797,158 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         refreshDrumLabels();
+        refreshUnitMS();
+    }
+
+    // ------------------------------------------------------------ instrument units: fold / order / mute-solo
+
+    function unitSections() { return [...document.querySelectorAll('.sequencer-section[data-mode="instruments"]')]; }
+    function unitChannels(sec) { return (UNIT_GROUPS[sec.id] || (() => []))(); }
+
+    function loadUiPrefs() {
+        try { return JSON.parse(localStorage.getItem(UI_KEY) || '{}') || {}; } catch (e) { return {}; }
+    }
+    function saveUiPrefs() {
+        const secs = unitSections();
+        const prefs = {
+            order: secs.map(sec => sec.id),
+            collapsed: secs.filter(sec => sec.classList.contains('collapsed')).map(sec => sec.id)
+        };
+        try { localStorage.setItem(UI_KEY, JSON.stringify(prefs)); } catch (e) { /* ignore */ }
+    }
+
+    function decorateUnits() {
+        const prefs = loadUiPrefs();
+        const saved = Array.isArray(prefs.order) ? prefs.order.filter(id => UNIT_GROUPS[id]) : [];
+        const order = saved.length === UNIT_DEFAULT_ORDER.length ? saved : UNIT_DEFAULT_ORDER;
+        const main = document.querySelector('.sequencer-container');
+        const current = unitSections();
+        const after = current[current.length - 1].nextElementSibling;
+        const ordered = [...order.map(id => $(id)).filter(Boolean), ...current.filter(sec => !order.includes(sec.id))];
+        ordered.forEach(sec => main.insertBefore(sec, after));
+
+        ordered.forEach(sec => {
+            const title = sec.querySelector('.unit-title');
+            const tools = sec.querySelector('.unit-tools');
+            const h2 = title.querySelector('h2');
+
+            const fold = document.createElement('button');
+            fold.className = 'unit-fold';
+            fold.type = 'button';
+            fold.title = '折りたたむ / 開く';
+            fold.setAttribute('aria-expanded', 'true');
+            fold.innerHTML = '<span></span>';
+            fold.addEventListener('click', () => toggleUnit(sec));
+            h2.addEventListener('click', () => toggleUnit(sec));
+            title.insertBefore(fold, title.firstChild);
+
+            const ms = document.createElement('div');
+            ms.className = 'unit-ms';
+            ms.innerHTML =
+                '<button class="rc rc-m" type="button" data-act="mute" title="このユニットの全チャンネルをミュート">M</button>' +
+                '<button class="rc rc-s" type="button" data-act="solo" title="このユニットの全チャンネルをソロ">S</button>';
+            ms.addEventListener('click', e => {
+                const btn = e.target.closest('.rc');
+                if (btn) unitMuteSolo(sec, btn.dataset.act);
+            });
+            title.appendChild(ms);
+
+            const ord = document.createElement('div');
+            ord.className = 'unit-order';
+            ord.innerHTML =
+                '<button class="rc" type="button" data-dir="-1" title="ユニットを上へ">▲</button>' +
+                '<button class="rc" type="button" data-dir="1" title="ユニットを下へ">▼</button>';
+            ord.addEventListener('click', e => {
+                const btn = e.target.closest('.rc');
+                if (btn && !btn.disabled) moveUnit(sec, parseInt(btn.dataset.dir));
+            });
+            tools.appendChild(ord);
+
+            if (Array.isArray(prefs.collapsed) && prefs.collapsed.includes(sec.id)) setUnitCollapsed(sec, true, false);
+        });
+        refreshUnitOrderButtons();
+        reorderMixerStrips();
+        refreshUnitMS();
+    }
+
+    function setUnitCollapsed(sec, on, save = true) {
+        sec.classList.toggle('collapsed', on);
+        const fold = sec.querySelector('.unit-fold');
+        if (fold) fold.setAttribute('aria-expanded', String(!on));
+        if (save) saveUiPrefs();
+    }
+    function toggleUnit(sec) {
+        const on = !sec.classList.contains('collapsed');
+        setUnitCollapsed(sec, on);
+        flash(UNIT_LABELS[sec.id] + (on ? ' CLOSED' : ' OPEN'), 900);
+    }
+
+    function moveUnit(sec, dir) {
+        const secs = unitSections();
+        const idx = secs.indexOf(sec);
+        const target = idx + dir;
+        if (idx < 0 || target < 0 || target >= secs.length) return;
+        const main = sec.parentElement;
+        if (dir < 0) main.insertBefore(sec, secs[target]);
+        else main.insertBefore(secs[target], sec);
+        refreshUnitOrderButtons();
+        reorderMixerStrips();
+        saveUiPrefs();
+        sec.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        flash('ORDER · ' + unitSections().map(x => UNIT_LABELS[x.id]).join(' → '), 1600);
+    }
+    function refreshUnitOrderButtons() {
+        const secs = unitSections();
+        secs.forEach((sec, i) => {
+            const up = sec.querySelector('.unit-order [data-dir="-1"]');
+            const dn = sec.querySelector('.unit-order [data-dir="1"]');
+            if (up) up.disabled = i === 0;
+            if (dn) dn.disabled = i === secs.length - 1;
+        });
+    }
+    /** Mixer strips follow the unit order on screen. */
+    function reorderMixerStrips() {
+        const box = $('mixerStrips');
+        if (!box) return;
+        unitSections().forEach(sec => unitChannels(sec).forEach(id => {
+            const strip = box.querySelector('.mx-strip[data-ch="' + id + '"]');
+            if (strip) box.appendChild(strip);
+        }));
+    }
+
+    function unitMuteSolo(sec, act) {
+        const ids = unitChannels(sec);
+        if (!ids.length) return;
+        if (act === 'mute') {
+            const all = ids.every(id => audioEngine.mixState(id).mute);
+            ids.forEach(id => audioEngine.setMute(id, !all));
+            flash(UNIT_LABELS[sec.id] + (all ? ' UNMUTED' : ' MUTED'), 900);
+        } else if (act === 'solo') {
+            const all = ids.every(id => audioEngine.mixState(id).solo);
+            ids.forEach(id => audioEngine.setSolo(id, !all));
+            flash(UNIT_LABELS[sec.id] + (all ? ' SOLO OFF' : ' SOLO'), 900);
+        }
+        markDirty();
+    }
+    function refreshUnitMS() {
+        const anySolo = CHANNEL_IDS.some(id => audioEngine.mixState(id).solo);
+        unitSections().forEach(sec => {
+            const ms = sec.querySelector('.unit-ms');
+            if (!ms) return;
+            const ids = unitChannels(sec);
+            const states = ids.map(id => audioEngine.mixState(id));
+            const allMute = states.length > 0 && states.every(m => m.mute);
+            const someMute = states.some(m => m.mute);
+            const allSolo = states.length > 0 && states.every(m => m.solo);
+            const someSolo = states.some(m => m.solo);
+            const mBtn = ms.querySelector('.rc-m');
+            const sBtn = ms.querySelector('.rc-s');
+            mBtn.classList.toggle('on', allMute);
+            mBtn.classList.toggle('part', someMute && !allMute);
+            sBtn.classList.toggle('on', allSolo);
+            sBtn.classList.toggle('part', someSolo && !allSolo);
+            sec.classList.toggle('unit-silent', allMute || (anySolo && !someSolo));
+        });
     }
 
     // ------------------------------------------------------------ gate steps
@@ -997,11 +1173,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             state.style = c.style;
             sequencer.setStretch(100);
-            sequencer.setChainBars(4);
-            sequencer.setChainEnabled(true);
-            if (sequencer.song.enabled) disableSong();
             sequencer.selectPattern(0);
-            $('chainBars').value = '4';
 
             chaosFx.polyEnabled = false;
             sequencer.steps303 = 16;
@@ -1043,8 +1215,8 @@ document.addEventListener('DOMContentLoaded', () => {
         $('chainBars').value = String(sequencer.chain.bars);
         $('songBars').value = String(state.songBars);
         $('styleSelect').value = state.style;
-        $('keySelect').value = state.root;
-        $('scaleSelect').value = state.scale;
+        $('keySelect').value = state.randomKey ? 'random' : String(state.root);
+        $('scaleSelect').value = state.randomScale ? 'random' : state.scale;
         $('recLength').value = state.recLength;
         $('scopeMode').value = state.scopeMode;
         Object.keys(state.locks).forEach(k => {
@@ -1396,11 +1568,23 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         $('styleSelect').addEventListener('change', e => { state.style = e.target.value; markDirty(); });
-        $('keySelect').addEventListener('change', e => { state.root = parseInt(e.target.value); updateLCDStatic(); markDirty(); });
-        $('scaleSelect').addEventListener('change', e => { state.scale = e.target.value; updateLCDStatic(); markDirty(); });
+        $('keySelect').addEventListener('change', e => {
+            state.randomKey = e.target.value === 'random';
+            if (!state.randomKey) state.root = parseInt(e.target.value);
+            updateLCDStatic(); markDirty();
+        });
+        $('scaleSelect').addEventListener('change', e => {
+            state.randomScale = e.target.value === 'random';
+            if (!state.randomScale) state.scale = e.target.value;
+            updateLCDStatic(); markDirty();
+        });
 
         $('composeBtn').addEventListener('click', () => {
-            const c = MusicGen.compose({ style: state.style, root: state.root, scale: state.scale });
+            const c = MusicGen.compose({
+                style: state.style,
+                root: state.randomKey ? 'random' : state.root,
+                scale: state.randomScale ? 'random' : state.scale
+            });
             applyComposition(c);
             $('composeBtn').classList.add('is-on');
             setTimeout(() => $('composeBtn').classList.remove('is-on'), 600);
@@ -2508,6 +2692,8 @@ document.addEventListener('DOMContentLoaded', () => {
             master: audioEngine.masterVolume,
             root: state.root,
             scale: state.scale,
+            randomKey: state.randomKey,
+            randomScale: state.randomScale,
             style: state.style,
             octave: state.selectedOctave,
             note: state.selectedNote,
@@ -2585,6 +2771,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (typeof data.master === 'number') { audioEngine.masterVolume = Math.max(0, Math.min(1, data.master)); audioEngine.setMasterVolume(audioEngine.masterVolume); }
             if (Number.isInteger(data.root)) state.root = Math.max(0, Math.min(11, data.root));
             if (MusicGen.SCALES[data.scale]) state.scale = data.scale;
+            state.randomKey = !!data.randomKey;
+            state.randomScale = !!data.randomScale;
             if (MusicGen.STYLES[data.style]) state.style = data.style;
             if ([1, 2, 3].includes(data.octave)) state.selectedOctave = data.octave;
             if (NOTES.includes(data.note)) state.selectedNote = data.note;
