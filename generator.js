@@ -771,7 +771,7 @@ const MusicGen = (() => {
 
     // ------------------------------------------------------------ arrangement
     const ALL_BUT = (keep) => ['kick', 'snare', 'clap', 'hihat_c', 'hihat_o', 'tom_lo', 'tom_hi', 'cymbal', 'rimshot', 'cowbell',
-        's1', 's2', 's3', 's4', '303', 'stab'].filter(id => !keep.includes(id));
+        '303', 'stab'].filter(id => !keep.includes(id));
 
     /**
      * Song layout over the four patterns. Sections: { name, start, len, patterns, mutes, filter:[from,to]|null, delay, reverb }.
@@ -779,9 +779,10 @@ const MusicGen = (() => {
      */
     function arrange({ bars = 32, chainBars = 4 } = {}) {
         const sec = (name, start, len, patterns, mutes, extra = {}) => ({ name, start, len, patterns, mutes, filter: null, delay: null, reverb: null, ...extra });
-        const introKeep = ['kick', 'hihat_c', 'hihat_o', 'rimshot', 's1'];
+        // Sampler rows (S1–S4) are never auto-muted.
+        const introKeep = ['kick', 'hihat_c', 'hihat_o', 'rimshot'];
         const buildMutes = ['stab', 'cymbal'];
-        const breakMutes = ['kick', 'tom_lo', 'tom_hi', 's1', 's2'];
+        const breakMutes = ['kick', 'tom_lo', 'tom_hi'];
         let sections;
         if (bars >= 64) {
             sections = [

@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
         stab.init();
         chaosFx.updateDelay(sequencer.bpm);
         recorder.attach();
-        sampler.restore().then(n => { if (n) { refreshSamplerUI(); refreshDrumLabels(); } }).catch(() => { /* ignore */ });
+        sampler.decodePending().catch(() => { /* ignore */ });
     };
 
     const NOTES = MusicGen.NOTES;
@@ -117,6 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
     bindKeyboard();
     bindDragDrop();
     loadState();
+    sampler.restore().catch(() => { /* IndexedDB unavailable */ });
     bindPersistence();
     initMidi();
     requestAnimationFrame(frame);
@@ -673,7 +674,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     '<div class="knob-wrapper"><input type="range" id="smp_decay_' + i + '" data-knob data-size="s" data-format="sec" min="0" max="2" step="0.01" value="0" data-default="0"><label>GATE</label></div>' +
                     '<div class="knob-wrapper"><input type="range" id="smp_start_' + i + '" data-knob data-size="s" data-format="pct" min="0" max="95" value="0" data-default="0"><label>START</label></div>' +
                 '</div>';
-            slot.querySelector('.smp-pad').addEventListener('click', () => previewDrum('s' + (i + 1), false));
+            slot.querySelector('.smp-pad').addEventListener('click', () => previewDrum('s' + (i + 1), false, true));
             slot.querySelector('.smp-load').addEventListener('click', () => { state.sampleTarget = i; $('sampleFile').click(); });
             slot.querySelector('.smp-rev').addEventListener('click', () => { sampler.setReverse(i, !sampler.pads[i].reverse); refreshSamplerUI(); markDirty(); previewDrum('s' + (i + 1), false); });
             slot.querySelector('.smp-choke').addEventListener('click', () => { sampler.pads[i].choke = !sampler.pads[i].choke; refreshSamplerUI(); markDirty(); });
@@ -720,8 +721,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.smp-slot').forEach(slot => {
             const i = parseInt(slot.dataset.idx);
             const pad = sampler.pads[i];
-            slot.classList.toggle('loaded', !!pad.buffer);
-            slot.querySelector('.smp-name').textContent = pad.buffer ? (pad.name.length > 18 ? pad.name.slice(0, 17) + '…' : pad.name) : 'EMPTY';
+            slot.classList.toggle('loaded', sampler.hasSample(i));
+            slot.querySelector('.smp-name').textContent = sampler.hasSample(i) ? (pad.name.length > 18 ? pad.name.slice(0, 17) + '…' : pad.name) : 'EMPTY';
             slot.querySelector('.smp-rev').classList.toggle('active', pad.reverse);
             slot.querySelector('.smp-choke').classList.toggle('active', pad.choke);
             Knobs.set('smp_pitch_' + i, pad.pitch);
@@ -1068,8 +1069,9 @@ document.addEventListener('DOMContentLoaded', () => {
         stab.trigger(s.note, s.octave, s.chord, audioEngine.currentTime + 0.01, { accent: !!s.accent, gate: 0.25 });
     }
 
-    function previewDrum(id, accent) {
-        if (sequencer.isPlaying) return;
+    /** `live`: sound even while the sequencer runs (sampler pads are played by hand over the beat). */
+    function previewDrum(id, accent, live = false) {
+        if (sequencer.isPlaying && !live) return;
         audioEngine.init();
         audioEngine.resume();
         tr808.init();
@@ -1145,7 +1147,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const L = state.locks;
         withHistoryLock(() => {
             if (!L.d808) {
-                c.patterns808.forEach((p, i) => sequencer.setPattern808(i, p));
+                c.patterns808.forEach((p, i) => sequencer.setDrumPattern808(i, p));
                 sequencer.setBPM(c.bpm);
                 sequencer.setSwing(c.swing);
                 tr808.setKits(c.kit);
@@ -1460,7 +1462,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     sequencer.onSection = (sec, bar, time, barDur) => {
-        CHANNEL_IDS.forEach(id => audioEngine.setAutoMute(id, sec.mutes.includes(id), time));
+        // Sampler pads are played by the user, so the arrangement never mutes them (older saved songs list S1–S4 too).
+        CHANNEL_IDS.forEach(id => audioEngine.setAutoMute(id, sec.mutes.includes(id) && !tr808.isSample(id), time));
         if (sec.filter) audioEngine.sweepFilter(sec.filter[0], sec.filter[1], time, time + sec.len * barDur);
         else { audioEngine.filterAuto = null; audioEngine.setFilter(state.userFilter, { time }); }
         patQueue.push({ section: sec, t: time });
@@ -1731,7 +1734,10 @@ document.addEventListener('DOMContentLoaded', () => {
         $('paste303').addEventListener('click', () => { if (state.clip303) { apply303(state.clip303); flash('303 PATTERN PASTED'); } });
 
         $('genBeatBtn').addEventListener('click', () => {
-            apply808(MusicGen.generateBeat(state.style));
+            commit();
+            sequencer.setDrumPattern808(sequencer.currentPattern808, MusicGen.generateBeat(state.style));
+            refreshAllPads();
+            markDirty();
             flash('BEAT GENERATED · ' + MusicGen.STYLES[state.style].name);
         });
         $('genLineBtn').addEventListener('click', () => {

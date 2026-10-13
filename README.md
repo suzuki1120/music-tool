@@ -18,7 +18,7 @@
 - **トラック別ステップ数（ポリメーター）**: LEN モードで最後のステップをクリック。303 は POLY 303 で別途設定。
 - **パラメータロック**: 303 のステップを選択して P-LOCK の REC を点灯し、ノブを回すとそのステップだけに CUTOFF / RESONANCE / ENV MOD / DECAY を記録。
 - **FILL**（押している間だけフィルイン）、**HUMAN**（発音タイミングと強さの揺らぎ）、**TAP** テンポ、SWING。
-- **SONG モード**: ARRANGE を押すと現在の 4 パターンから 32 / 64 小節の曲構成（INTRO → BUILD → DROP → BREAK → …）を生成し、ミュート・マスターフィルター・ディレイを小節単位で自動操作します。
+- **SONG モード**: ARRANGE を押すと現在の 4 パターンから 32 / 64 小節の曲構成（INTRO → BUILD → DROP → BREAK → …）を生成し、ミュート・マスターフィルター・ディレイを小節単位で自動操作します。サンプラー（S1〜S4）は自動ミュートの対象外です。
 
 ### 自動生成（COMPOSER）
 - STYLE（TECHNO / HOUSE / ACID / ELECTRO / MINIMAL / BREAKS）、KEY、SCALE を選んで COMPOSE TRACK。ビート、ベースライン、スタブのコード進行、キット、音色、テンポ、スイングを一括で生成します。KEY と SCALE には **RND** があり、COMPOSE のたびに選び直します。

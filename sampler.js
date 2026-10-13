@@ -14,6 +14,7 @@ class Sampler {
         this.onChange = null;   // (idx) → UI
         this._dbName = 'synthseq-samples';
         this._store = 'pads';
+        this._touched = [false, false, false, false];   // loaded / cleared by the user this session → restore must not overwrite
     }
 
     _emptyPad() {
@@ -42,11 +43,13 @@ class Sampler {
     setDecay(idx, v) { this.pads[idx].decay = Math.max(0, Math.min(4, v)); }
     setStart(idx, v) { this.pads[idx].start = Math.max(0, Math.min(0.95, v)); }
     setReverse(idx, on) { this.pads[idx].reverse = !!on; }
-    hasSample(idx) { return !!this.pads[idx].buffer; }
+    /** True once audio is stored for the pad (it may still be waiting for the AudioContext to decode). */
+    hasSample(idx) { const p = this.pads[idx]; return !!(p.buffer || p.raw); }
 
     // ---------------------------------------------------------------- loading
     async load(idx, source, name = '') {
         if (!this.engine.init()) throw new Error('no audio context');
+        this._touched[idx] = true;
         let raw;
         if (source instanceof ArrayBuffer) raw = source;
         else raw = await source.arrayBuffer();
@@ -63,6 +66,7 @@ class Sampler {
     }
 
     clear(idx) {
+        this._touched[idx] = true;
         const keep = this.pads[idx];
         this.pads[idx] = this._emptyPad();
         this.pads[idx].pitch = keep.pitch;
@@ -94,7 +98,8 @@ class Sampler {
         const target = dest || this.engine.channelInput('s' + (idx + 1));
 
         if (pad.choke && pad._last) {
-            try { pad._last.gain.gain.setTargetAtTime(0, time, 0.008); } catch (e) { /* done */ }
+            // Drop the old voice's pending GATE envelope first, or it would bring the level back up.
+            try { const g = pad._last.gain.gain; g.cancelScheduledValues(time); g.setTargetAtTime(0, time, 0.008); } catch (e) { /* done */ }
         }
 
         const src = ctx.createBufferSource();
@@ -155,7 +160,10 @@ class Sampler {
         db.close();
     }
 
-    /** Restore stored samples. Needs a running context, so call after the first user gesture. */
+    /**
+     * Restore stored samples. Reading IndexedDB needs no AudioContext, so this runs at page load and the
+     * pads show their names right away; decoding waits for the context (decodePending, called on init).
+     */
     async restore() {
         let db;
         try { db = await this._db(); } catch (e) { return 0; }
@@ -175,17 +183,34 @@ class Sampler {
         let n = 0;
         for (const row of rows) {
             if (typeof row.idx !== 'number' || row.idx < 0 || row.idx > 3 || !row.raw) continue;
+            if (this._touched[row.idx]) continue;
+            const pad = this.pads[row.idx];
+            pad.raw = row.raw;
+            pad.buffer = null;
+            pad.reversed = null;
+            pad.name = row.name || pad.name;
+            n++;
+            if (this.onChange) this.onChange(row.idx);
+        }
+        await this.decodePending();
+        return n;
+    }
+
+    /** Decode restored pads that are still raw bytes. No-op until the AudioContext exists. */
+    async decodePending() {
+        if (!this.engine.ctx) return;
+        for (let idx = 0; idx < 4; idx++) {
+            const pad = this.pads[idx];
+            if (!pad.raw || pad.buffer) continue;
+            const raw = pad.raw;
             try {
-                const buffer = await this.engine.ctx.decodeAudioData(row.raw.slice(0));
-                const pad = this.pads[row.idx];
+                const buffer = await this.engine.ctx.decodeAudioData(raw.slice(0));
+                // The pad may have been reloaded or cleared while decoding.
+                if (this.pads[idx] !== pad || pad.raw !== raw || pad.buffer) continue;
                 pad.buffer = buffer;
                 pad.reversed = null;
-                pad.raw = row.raw;
-                pad.name = row.name || pad.name;
-                n++;
-                if (this.onChange) this.onChange(row.idx);
+                if (this.onChange) this.onChange(idx);
             } catch (e) { /* undecodable */ }
         }
-        return n;
     }
 }

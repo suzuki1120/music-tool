@@ -157,6 +157,23 @@ class Sequencer {
         return out;
     }
 
+    /**
+     * Replace only the drum rows of pattern `index` (generated beats have no sampler rows); S1–S4 keep
+     * their steps, extras and lengths.
+     */
+    setDrumPattern808(index, data) {
+        const cur = this.patterns808[index];
+        const merged = { ...data };
+        const ext = { ...(data.__ext || {}) };
+        const lens = {};
+        this.tr808.instruments.filter(inst => inst.group === 'smp').forEach(({ id }) => {
+            merged[id] = cur[id].slice();
+            if (this.ext808[index][id]) ext[id] = this.ext808[index][id];
+            if (this.len808[index][id]) lens[id] = this.len808[index][id];
+        });
+        this.setPattern808(index, merged, ext, lens);
+    }
+
     setPattern303(index, data) {
         const target = this.patterns303[index];
         for (let i = 0; i < this.steps; i++) {
